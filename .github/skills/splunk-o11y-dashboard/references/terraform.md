@@ -2,6 +2,7 @@
 
 ## Contents
 
+- [Critical pre-generation gate: Terraform provider schema](#critical-pre-generation-gate-terraform-provider-schema)
 - [Core rule](#core-rule)
 - [Provider and resource hierarchy](#provider-and-resource-hierarchy)
 - [Dashboard resource hierarchy](#dashboard-resource-hierarchy)
@@ -18,6 +19,233 @@
 
 Use this reference whenever generating, reviewing, validating, or troubleshooting Terraform for Splunk Observability Cloud dashboards.
 
+## Critical pre-generation gate: Terraform provider schema
+
+Apply this gate before generating any `splunk-terraform/signalfx` resource.
+
+### Verify the resource schema before generating attributes
+
+Treat each Terraform resource independently.
+
+Do not assume an attribute supported by one chart resource is supported by another.
+
+Before generating a resource, verify:
+
+- resource type
+- top-level attributes
+- nested blocks
+- allowed `plot_type`
+- dashboard variable attributes
+- layout attributes
+- unit attributes
+- exported attributes
+- resource references
+
+Do not generate plausible-looking attributes from memory.
+
+### Terraform input variables are not Splunk dashboard variables
+
+Do not confuse:
+
+```hcl
+variable "service_name" {
+  type = string
+}
+```
+
+with a Splunk Observability Cloud dashboard variable.
+
+Terraform `variable` blocks define Terraform configuration inputs.
+
+Splunk dashboard variables belong inside the dashboard resource using the provider-supported nested block, for example structurally:
+
+```hcl
+resource "signalfx_dashboard" "example" {
+  # ...
+
+  variable {
+    property = "service.name"
+    alias    = "Service"
+  }
+}
+```
+
+Only include attributes inside that nested `variable` block that are verified in the applicable provider schema.
+
+Do not invent dashboard-variable attributes such as:
+
+```hcl
+default         = "payments"
+value_label     = "Service"
+suggested_value = "payments"
+```
+
+unless those exact attributes are supported by the selected provider version.
+
+### Chart units
+
+Do not generate arbitrary chart attributes such as:
+
+```hcl
+unit = "Milliseconds"
+unit = "Requests/sec"
+```
+
+unless the selected resource schema explicitly defines `unit`.
+
+Do not use:
+
+```hcl
+unit_prefix = "m"
+```
+
+to represent milliseconds.
+
+For resources that support plot-level display configuration, use only verified nested attributes such as `viz_options` and `value_unit`, and only on resources whose provider schema explicitly supports them.
+
+A display unit does not convert telemetry.
+
+The SignalFlow result must already have the correct unit.
+
+### Table chart schema
+
+Treat `signalfx_table_chart` separately from time charts and single-value charts.
+
+Do not copy visualization blocks from another chart type.
+
+Only generate attributes documented for `signalfx_table_chart`.
+
+When appropriate and supported, table grouping can use:
+
+```hcl
+group_by = ["sf_operation"]
+```
+
+Do not generate `viz_options` or other visualization-specific nested blocks for a table chart unless the selected provider schema explicitly supports them.
+
+### Dashboard filters and variables
+
+Do not create fixed dimension values unless they were:
+
+- explicitly supplied by the user
+- discovered from live telemetry
+- provided by an inventory
+
+A requested service such as:
+
+```text
+payments
+```
+
+may be used as a fixed `service.name` filter because it was supplied by the user.
+
+Do not invent environment values.
+
+If the user requests both:
+
+- a dashboard for service `payments`
+- a `service.name` dashboard variable
+
+preserve the user's intent carefully.
+
+Do not generate conflicting fixed filters and variables without explaining the behavior.
+
+### Variable-to-chart consistency
+
+If a dashboard property is exposed as an interactive variable, do not hard-code a conflicting value for that same property inside chart SignalFlow unless the requested behavior explicitly requires both.
+
+For example, if the dashboard contains:
+
+```hcl
+variable {
+  property = "service.name"
+  alias    = "Service"
+}
+```
+
+and the purpose of that variable is to switch services, do not generate every chart with:
+
+```python
+filter('service.name', 'payments')
+```
+
+because the chart remains permanently scoped to `payments`.
+
+Choose one of these patterns deliberately:
+
+1. **Dedicated service dashboard**
+   - use `service.name = payments` as a fixed dashboard scope
+   - do not expose `service.name` as a service-switching variable
+
+2. **Reusable service dashboard**
+   - expose `service.name` as a dashboard variable
+   - ensure chart filtering is compatible with that variable mechanism
+   - do not hard-code `payments` inside each chart
+
+If the user's request contains both a named service and a requested `service.name` filter, prefer the reusable variable interpretation unless the user explicitly states that the dashboard must be permanently locked to that service.
+
+The supplied service name may be documented as the intended initial context, but do not invent an unsupported default-value attribute merely to preselect it.
+
+Before finalizing Terraform, verify that every dashboard variable can actually affect the charts it is intended to control.
+
+### Dashboard URL
+
+When the dashboard resource exports a URL attribute, reference it directly:
+
+```hcl
+output "dashboard_url" {
+  value = signalfx_dashboard.example.url
+}
+```
+
+Do not quote the Terraform resource reference:
+
+```hcl
+value = "signalfx_dashboard.example.url"
+```
+
+Do not construct a dashboard URL from:
+
+- a guessed realm
+- a guessed hostname
+- another unrelated resource
+- a fabricated data source
+
+### Unverified panels must not become Terraform resources
+
+If a panel is marked `UNVERIFIED` because its telemetry, SignalFlow, dimensions, unit, or semantics could not be established:
+
+1. keep the panel in the dashboard design
+2. document why it is unresolved
+3. omit the chart resource from deployable Terraform
+4. omit its dashboard `chart` block
+5. do not generate speculative chart code and call the Terraform production-ready
+
+The generated Terraform may therefore contain fewer chart resources than the requested dashboard design.
+
+This is correct behavior when some panels cannot be implemented safely.
+
+### Validation claims
+
+Do not claim:
+
+```text
+Terraform valid
+Provider schema validated
+Ready to apply
+Production-ready
+```
+
+merely because HCL was generated.
+
+Use:
+
+- `GENERATED` when code was produced only
+- `STATICALLY_VALIDATED` only after the defined static validation requirements were actually met
+- `PLAN_VALIDATED` only after `terraform plan` completed successfully
+- `APPLIED` only after a successful apply
+
+If `terraform validate` was not executed successfully, state that explicitly.
 
 ## Core rule
 

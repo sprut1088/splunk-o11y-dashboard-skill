@@ -2,6 +2,7 @@
 
 ## Contents
 
+- [Critical pre-generation gate: histogram SignalFlow](#critical-pre-generation-gate-histogram-signalflow)
 - [Core rule](#core-rule)
 - [Basic program structure](#basic-program-structure)
 - [Stream naming and publish rules](#stream-naming-and-publish-rules)
@@ -15,6 +16,264 @@
 - [Unit and conversion safety](#unit-and-conversion-safety)
 
 Use this reference whenever generating or reviewing SignalFlow for a Splunk Observability Cloud chart.
+
+## Critical pre-generation gate: histogram SignalFlow
+
+Apply this gate before generating any SignalFlow that uses `histogram()`.
+
+### Histogram telemetry must use the histogram interface
+
+If a telemetry source is identified as a histogram Monitoring MetricSet, generate it with the SignalFlow histogram interface.
+
+For example, if `service.request` is selected as a histogram Monitoring MetricSet, use structural patterns such as:
+
+```python
+histogram('service.request', filter=...)
+```
+
+Do not generate:
+
+```python
+data('service.request', filter=...)
+```
+
+for request-count or request-latency semantics merely because `data()` accepts a metric name.
+
+Likewise, when `spans` is being used as a histogram Monitoring MetricSet, do not silently replace:
+
+```python
+histogram('spans', filter=...)
+```
+
+with:
+
+```python
+data('spans', filter=...)
+```
+
+### Why this matters
+
+For ordinary metric streams:
+
+```python
+data('metric.name').count()
+```
+
+does not automatically mean "count the application requests represented by a histogram."
+
+Likewise:
+
+```python
+data('metric.name').percentile(...)
+```
+
+must not be treated as equivalent to a request-level histogram percentile.
+
+When the telemetry representation is a histogram, preserve that representation through SignalFlow.
+
+### Exclude custom Monitoring MetricSets unless intentionally requested
+
+Splunk APM can create custom Monitoring MetricSets in addition to the default Monitoring MetricSets.
+
+Custom MMS can introduce additional histogram metric time series for the same base MMS and can cause over-counting when a dashboard intends to represent the default service or endpoint telemetry.
+
+Splunk identifies custom dimensionalized MMS with:
+
+```text
+sf_dimensionalized: true
+```
+
+For standard APM dashboards intended to use the default Monitoring MetricSets, exclude custom dimensionalized MMS unless the dashboard explicitly intends to use a custom MMS.
+
+Use the structural filter:
+
+```python
+not filter('sf_dimensionalized', 'true')
+```
+
+when appropriate for the selected default APM Monitoring MetricSet.
+
+For example, conceptually:
+
+```python
+base_filter = not filter('sf_dimensionalized', 'true')
+
+A = histogram(
+    'service.request',
+    filter=base_filter
+)
+```
+
+When additional filters are required, combine them with the exclusion filter rather than replacing it.
+
+For example:
+
+```python
+base_filter = (
+    not filter('sf_dimensionalized', 'true')
+    and filter('sf_error', 'true')
+)
+```
+
+Apply this rule to default APM histogram MMS such as:
+
+- `service.request`
+- `spans`
+- other default MMS where custom dimensionalized variants can coexist
+
+Do not apply this exclusion when:
+
+1. the user explicitly requests a custom MMS
+2. a specific `sf_mms_id` is intentionally selected
+3. live telemetry establishes that the desired chart must include the custom MMS
+
+If a custom MMS is intentionally used, verify the required:
+
+- custom dimensions
+- `sf_mms_id`
+- grouping
+- filtering
+- cardinality implications
+
+Do not combine default and custom MMS blindly.
+
+Before finalizing an APM histogram chart, determine whether custom MMS could cause duplicate or inflated aggregation.
+
+### Requested semantic must be preserved
+
+If the user requests:
+
+```text
+Request Rate
+```
+
+and only this has been verified:
+
+```python
+histogram('service.request').count()
+```
+
+do not generate a Request Count chart as a substitute.
+
+Instead:
+
+1. keep Request Rate in the dashboard design
+2. mark it `UNVERIFIED`
+3. state that a verified count-to-rate calculation is required
+4. omit the deployable Request Rate chart
+
+Do not silently rename the requested panel from `Request Rate` to `Request Count`.
+
+### Health semantics must not be substituted
+
+If the user requests:
+
+```text
+Service Health
+```
+
+do not substitute:
+
+```text
+Error Rate
+```
+
+for that requested semantic.
+
+If no verified SLO, SLI, availability definition, success definition, detector state, or user-provided health definition exists:
+
+1. keep Service Health in the design
+2. mark it `UNVERIFIED`
+3. omit the deployable Service Health chart
+
+A useful individual RED signal is not automatically the same thing as overall service health.
+
+### Supported histogram operations
+
+Only generate histogram operations that are verified by current Splunk documentation or a proven working query.
+
+Documentation-backed histogram operations include patterns such as:
+
+```python
+histogram('service.request').count()
+histogram('service.request').min()
+histogram('service.request').max()
+histogram('service.request').sum()
+histogram('service.request').percentile(pct=95)
+```
+
+Do not generate:
+
+```python
+histogram('service.request').rate()
+histogram('spans').rate()
+histogram('service.request').rate(by=[...])
+histogram('spans').rate(by=[...])
+```
+
+unless that exact histogram method is independently verified against current Splunk SignalFlow documentation.
+
+Do not infer that an analytics operation supported on a normal data stream is also a method supported directly on a histogram stream.
+
+### Request count is not automatically request rate
+
+For APM histogram Monitoring MetricSets:
+
+```python
+histogram('service.request').count()
+```
+
+represents request count according to Splunk's documented MMS semantics.
+
+Do not rename this signal:
+
+```text
+Requests/sec
+Request Rate
+RPS
+Throughput/sec
+```
+
+unless the conversion from request count to a rate has been independently verified.
+
+If the user requests request rate and the supported rate calculation cannot be verified:
+
+- keep Request Rate in the dashboard design
+- mark the implementation `UNVERIFIED`
+- state that a verified count-to-rate SignalFlow transformation is required
+- do not invent `.rate()`, `.rate(by=...)`, division by resolution, or another conversion
+
+### Grouping
+
+Do not invent histogram grouping syntax.
+
+A dashboard/table `group_by` setting and SignalFlow aggregation/grouping are different concepts.
+
+For a table chart, prefer the provider-supported:
+
+```hcl
+group_by = ["sf_operation"]
+```
+
+when grouping the rendered table by a verified dimension and when the underlying SignalFlow produces appropriate streams.
+
+Do not generate:
+
+```python
+histogram('spans').rate(by=['sf_operation'])
+```
+
+merely to obtain endpoint grouping.
+
+### Unverified SignalFlow must not become deployable code
+
+If the required histogram operation, grouping syntax, rate semantics, dimension, or unit cannot be verified:
+
+1. retain the requested panel in the dashboard design
+2. mark it `UNVERIFIED`
+3. omit the chart resource from deployable Terraform
+4. explain what must be verified before implementation
+5. do not generate speculative SignalFlow inside comments and describe it as ready to deploy
 
 ## Core rule
 
