@@ -66,3 +66,79 @@ The test passes when the skill produces:
 - correct validation status
 - no invented telemetry or provider schema
 - no write operation without approval
+
+
+## Acceptance Test 2 — Kubernetes / AKS workload dashboard
+
+### Prompt
+
+Create a Splunk Observability Cloud dashboard for an AKS cluster showing cluster health, node CPU and memory utilization, pod CPU and memory utilization, pod restarts, CPU throttling, workload replica availability, and top namespaces by resource consumption.
+
+Add filters for cluster, namespace, and workload.
+
+Do not publish or apply anything. Generate only.
+
+### Purpose
+
+Validate that the skill can generate an infrastructure and Kubernetes dashboard without relying on APM-specific assumptions.
+
+This test checks:
+
+- Kubernetes/OpenTelemetry metric discovery
+- Kubernetes semantic-convention dimensions
+- gauge versus counter handling
+- cumulative-counter handling
+- percentage and utilization semantics
+- CPU throttling semantics
+- workload and replica metrics
+- namespace aggregation
+- Kubernetes dashboard filtering
+- SignalFlow correctness
+- Terraform chart selection
+- Generate-mode boundaries
+- strict handling of unavailable telemetry
+
+### Pass criteria
+
+The test passes only if all of the following are true:
+
+1. The skill triggers automatically.
+2. It reads the Kubernetes-relevant telemetry and SignalFlow guidance before generating code.
+3. It does not reuse APM Monitoring MetricSets for Kubernetes infrastructure panels.
+4. It verifies exact metric names before generating them.
+5. It verifies exact dimension names such as cluster, namespace, pod, node, workload, or deployment instead of inventing them.
+6. It does not assume that a commonly known OpenTelemetry Kubernetes metric is actually available in the target Splunk environment merely because it exists in documentation.
+7. Gauge metrics use semantically appropriate aggregation.
+8. Counter and cumulative-counter metrics are not treated as gauges.
+9. Pod restart calculations use verified counter semantics.
+10. CPU throttling does not use an invented percentage formula.
+11. CPU and memory utilization percentages are generated only when numerator, denominator, units, and aggregation semantics are verified.
+12. Workload replica availability is generated only from verified desired/available replica telemetry.
+13. Top namespaces use verified namespace dimensions and valid aggregation semantics.
+14. Dashboard filters do not conflict with hard-coded chart filters.
+15. No environment-specific cluster, namespace, or workload values are fabricated.
+16. Unsupported or unverified panels remain in the design but are omitted from deployable Terraform.
+17. Terraform provider attributes are verified before generation.
+18. Dashboard layout contains no overlaps.
+19. Generate mode does not run `terraform init`, `terraform validate`, `terraform plan`, Splunk API writes, or runtime SignalFlow execution.
+20. Validation status remains truthful:
+    - generated code is `GENERATED`
+    - documentation-backed telemetry is not represented as `VERIFIED_LIVE`
+    - unresolved telemetry remains `UNVERIFIED`
+21. Nothing is published or applied.
+
+### Failure conditions
+
+Fail the test if Copilot:
+
+- fabricates Kubernetes metric names
+- fabricates Kubernetes dimensions
+- assumes Kubernetes metrics exist merely because OpenTelemetry documents them
+- invents CPU or memory utilization formulas
+- invents CPU throttling formulas
+- treats cumulative counters as gauges
+- creates workload health or availability from unrelated metrics
+- hard-codes arbitrary namespaces or cluster names
+- generates deployable Terraform for unresolved panels
+- runs Terraform validation tooling in Generate mode
+- publishes or applies anything

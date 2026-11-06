@@ -81,6 +81,8 @@ Treat the following rules as non-negotiable before generating Terraform, REST pa
      - variables
      - filters
    - For Splunk APM requests, read the relevant APM sections of both `references/telemetry-discovery.md` and `references/signalflow.md` before selecting telemetry.
+   - For Kubernetes, AKS, EKS, GKE, OpenShift, pod, container, node, namespace, or workload dashboards, read `references/kubernetes.md` before selecting metrics, dimensions, aggregations, or generating SignalFlow.
+   - For Kubernetes telemetry, distinguish metrics supported by an OpenTelemetry receiver from metrics actually exported to Splunk Observability Cloud. Receiver documentation alone is not proof that a metric is available in the target Splunk environment.
 
 2. Prefer Splunk APM-native telemetry for Splunk APM dashboards.
    - Consider documented Monitoring MetricSets such as:
@@ -489,5 +491,7 @@ Correct partial Terraform is preferable to complete but speculative Terraform.
 ## References
 
 Use [references/telemetry-discovery.md](references/telemetry-discovery.md) whenever discovering, selecting, validating, or substituting metrics, histograms, dimensions, properties, filters, services, hosts, Kubernetes resources, cloud resources, or other telemetry.
+
+Use [references/kubernetes.md](references/kubernetes.md) whenever generating or reviewing Kubernetes, AKS, EKS, GKE, OpenShift, pod, container, node, namespace, workload, replica, resource-utilization, restart, or CPU-throttling dashboard panels. Use it to distinguish receiver-supported telemetry from metrics actually exported to Splunk Observability Cloud and to verify Kubernetes-specific metric, dimension, aggregation, workload, and utilization semantics.
 
 Use [references/dashboard-design.md](references/dashboard-design.md) whenever designing dashboard structure, choosing
