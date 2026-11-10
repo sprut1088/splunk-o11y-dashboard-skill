@@ -35,21 +35,6 @@ Follow this workflow in order.
   - Run Terraform tooling or runtime validation only when the user explicitly requests Validate or Publish mode.
   - Static reasoning and documentation verification in Generate mode do not change the mode from `GENERATED`.
 
-   - Treat Generate, Validate, and Publish as strictly separate execution modes.
-- In Generate mode:
-  - generate the requested dashboard artifacts only
-  - perform reasoning-time checks against references and documentation
-  - web or documentation lookup is allowed when needed to verify telemetry, SignalFlow, or provider schema
-  - do not install or download Terraform or other validation tooling
-  - do not run `terraform init`
-  - do not run `terraform validate`
-  - do not run `terraform plan`
-  - do not execute SignalFlow against the target Splunk environment
-  - do not make Splunk API calls
-  - do not change the target environment
-- Run Terraform tooling or runtime validation only when the user explicitly requests Validate or Publish mode.
-- Static reasoning and documentation verification in Generate mode do not change the mode from `GENERATED`.
-
 3. Determine the dashboard experience.
    - Prefer the Splunk Observability Cloud new dashboard experience where supported.
    - Fall back to classic-compatible dashboard patterns when the requested feature or supported code path requires it.
