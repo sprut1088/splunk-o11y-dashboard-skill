@@ -30,10 +30,12 @@ Follow this workflow in order.
     - do not run `terraform validate`
     - do not run `terraform plan`
     - do not execute SignalFlow against the target Splunk environment
-    - do not make Splunk API calls
+    - read-only Splunk metadata or telemetry discovery is allowed when an existing authenticated connection is already available and the lookup does not modify resources
+    - do not use Splunk APIs to create, update, delete, publish, or otherwise modify resources
+    - do not execute generated SignalFlow against the target environment as runtime validation
     - do not change the target environment
   - Run Terraform tooling or runtime validation only when the user explicitly requests Validate or Publish mode.
-  - Static reasoning and documentation verification in Generate mode do not change the mode from `GENERATED`.
+  - Static reasoning, documentation verification, and read-only telemetry discovery do not change the mode from `GENERATED`.
 
 3. Determine the dashboard experience.
    - Prefer the Splunk Observability Cloud new dashboard experience where supported.
@@ -42,7 +44,8 @@ Follow this workflow in order.
    - Do not claim that Terraform or REST supports a new-experience capability unless that support has been verified.
 
 4. Discover and validate telemetry before generating charts.
-   - Prefer live Splunk Observability Cloud metadata when connectivity is available.
+   - Prefer read-only live Splunk Observability Cloud metadata when an existing authenticated connection is available.
+   - Use live discovery only to establish telemetry availability, dimensions, properties, metric types, or metadata; do not treat it as permission to run generated SignalFlow or modify Splunk resources.
    - Otherwise use user-provided metric and dimension inventories.
    - Otherwise use officially documented Splunk telemetry.
    - Use OpenTelemetry semantic conventions only when appropriate for the requested telemetry model.
