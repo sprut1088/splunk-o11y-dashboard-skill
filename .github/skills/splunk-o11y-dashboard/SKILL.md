@@ -71,6 +71,7 @@ Treat the following rules as non-negotiable before generating Terraform, REST pa
    - For Splunk APM requests, read the relevant APM sections of both `references/telemetry-discovery.md` and `references/signalflow.md` before selecting telemetry.
    - For Kubernetes, AKS, EKS, GKE, OpenShift, pod, container, node, namespace, or workload dashboards, read `references/kubernetes.md` before selecting metrics, dimensions, aggregations, or generating SignalFlow.
    - For Kubernetes telemetry, distinguish metrics supported by an OpenTelemetry receiver from metrics actually exported to Splunk Observability Cloud. Receiver documentation alone is not proof that a metric is available in the target Splunk environment.
+   - For Azure infrastructure, Azure Monitor, Application Gateway, Azure Firewall, ExpressRoute, Load Balancer, virtual machine, subscription, resource-group, region, or Azure resource dashboards, read `references/azure.md` before selecting metrics, dimensions, variables, aggregations, or generating SignalFlow.
 
 2. Prefer Splunk APM-native telemetry for Splunk APM dashboards.
    - Consider documented Monitoring MetricSets such as:
@@ -479,7 +480,12 @@ Correct partial Terraform is preferable to complete but speculative Terraform.
 ## References
 
 Use [references/telemetry-discovery.md](references/telemetry-discovery.md) whenever discovering, selecting, validating, or substituting metrics, histograms, dimensions, properties, filters, services, hosts, Kubernetes resources, cloud resources, or other telemetry.
-
 Use [references/kubernetes.md](references/kubernetes.md) whenever generating or reviewing Kubernetes, AKS, EKS, GKE, OpenShift, pod, container, node, namespace, workload, replica, resource-utilization, restart, or CPU-throttling dashboard panels. Use it to distinguish receiver-supported telemetry from metrics actually exported to Splunk Observability Cloud and to verify Kubernetes-specific metric, dimension, aggregation, workload, and utilization semantics.
-
-Use [references/dashboard-design.md](references/dashboard-design.md) whenever designing dashboard structure, choosing
+Use [references/azure.md](references/azure.md) whenever generating or reviewing Azure infrastructure dashboards. Use it to preserve exact Azure filter semantics, distinguish generic from service-specific dimensions, verify aggregation behavior, and avoid substituting resource IDs for requested resource names.
+Use [references/dashboard-design.md](references/dashboard-design.md) whenever designing dashboard structure, choosing charts, organizing rows, selecting dashboard variables, or validating the 12-column layout.
+Use [references/signalflow.md](references/signalflow.md) whenever generating or reviewing SignalFlow, including Splunk APM Monitoring MetricSets, histogram operations, grouping, count-versus-rate semantics, custom Monitoring MetricSet filtering, transformations, and units.
+Use [references/terraform.md](references/terraform.md) whenever generating or reviewing Terraform resources, provider schema, chart resources, dashboard variables, layout blocks, units, provider-version strategy, resource references, or dashboard URLs.
+Use [references/rest-api.md](references/rest-api.md) whenever REST API output, read-only API discovery, or publish/update operations are requested.
+Use [references/input-spec.md](references/input-spec.md) whenever interpreting structured YAML/JSON input or mapping natural-language requirements into a dashboard specification.
+Use [references/output-contract.md](references/output-contract.md) whenever formatting the final response, reporting preflight findings, telemetry status, validation status, unresolved panels, or publish/apply status.
+Use [references/acceptance-tests.md](references/acceptance-tests.md) when regression-testing or evaluating this skill against the maintained acceptance scenarios.
