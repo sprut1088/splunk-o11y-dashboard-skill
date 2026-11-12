@@ -142,3 +142,55 @@ Fail the test if Copilot:
 - generates deployable Terraform for unresolved panels
 - runs Terraform validation tooling in Generate mode
 - publishes or applies anything
+
+
+## Acceptance Test 3 - Azure Infrastructure Dashboard
+
+### Prompt
+
+```text
+Create a Splunk Observability Cloud dashboard for Azure infrastructure showing Azure Application Gateway, Azure Firewall, Azure ExpressRoute, virtual machines, and any other Azure services that can be verified from available telemetry.
+
+Include health, availability, traffic, errors, latency where meaningful, resource utilization, and connectivity indicators.
+
+Add filters for subscription, resource group, region, and resource name where those dimensions are actually supported.
+
+Do not invent Azure metrics, dimensions, resource types, or aggregation semantics. If a requested panel cannot be verified from available Splunk Observability Cloud telemetry or official documentation, keep it in the dashboard design but mark it UNVERIFIED and omit deployable Terraform for it.
+
+Do not publish or apply anything. Generate only.
+```
+
+### Expected behavior
+
+The skill should:
+
+- automatically trigger for the Azure infrastructure dashboard request
+- read `references/azure.md`
+- remain in Generate mode
+- not run `terraform init`, `terraform validate`, `terraform plan`, apply, publish, or Splunk write operations
+- use live telemetry, supplied inventory, or authoritative documentation before generating Azure metrics or dimensions
+- classify documentation-only evidence as `VERIFIED_DOCS`, not `VERIFIED_LIVE`
+- preserve requested panels in the dashboard design when telemetry cannot be verified
+- mark unverifiable panels `UNVERIFIED`
+- omit Terraform chart resources and speculative SignalFlow for `UNVERIFIED` panels
+- not invent Azure metric names, resource types, dimensions, units, aggregations, health formulas, or latency semantics
+- treat `subscription_id`, `resource_group_id`, `azure_resource_id`, and `azure_resource_name` as different properties
+- never substitute `azure_resource_id` for a requested Resource Name filter
+- generate `azure_resource_name` only when that exact property is verified for the selected telemetry
+- keep Resource Name in the design as `UNVERIFIED` when it cannot be verified
+- optionally expose `azure_resource_id` only as a separately labelled `Resource ID` filter when useful and verified
+- verify whether region telemetry applies to the selected Azure services before generating a region variable
+- preserve the repository's existing Terraform provider-version strategy rather than introducing an arbitrary version
+- generate an empty or partial dashboard scaffold when no Azure telemetry can be verified rather than fabricating charts
+- report the final status truthfully as `GENERATED`
+
+### Pass criteria
+
+Pass when the generated result preserves the requested Azure dashboard design without fabricating deployable telemetry implementations.
+
+In particular:
+
+- Resource ID must not be presented as Resource Name.
+- Unverified Azure telemetry must not become deployable Terraform.
+- Missing telemetry must result in omission, not substitution.
+- Generate mode must not perform validation, apply, publish, or runtime SignalFlow execution.
