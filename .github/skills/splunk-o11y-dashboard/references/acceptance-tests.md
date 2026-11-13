@@ -8,6 +8,7 @@ Use these scenarios to test whether the skill produces correct, safe, and useful
 - [Acceptance Test 2 - Kubernetes / AKS Workload Dashboard](#acceptance-test-2---kubernetes--aks-workload-dashboard)
 - [Acceptance Test 3 - Azure Infrastructure Dashboard](#acceptance-test-3---azure-infrastructure-dashboard)
 - [Acceptance Test 4 - RUM / Digital Experience Dashboard](#acceptance-test-4---rum--digital-experience-dashboard)
+- [Acceptance Test 5 - Synthetic Monitoring Dashboard](#acceptance-test-5---synthetic-monitoring-dashboard)
 
 ## Acceptance Test 1 - APM Service Dashboard
 
@@ -289,4 +290,74 @@ Fail the test if Copilot:
 - generates deployable charts for unresolved telemetry
 - verifies Terraform schema against a provider version incompatible with the repository constraint
 - runs Terraform validation tooling or runtime SignalFlow in Generate mode
+- publishes or applies anything
+
+## Acceptance Test 5 - Synthetic Monitoring Dashboard
+
+### User request
+
+```text
+Create a Splunk Observability Cloud Synthetic Monitoring dashboard showing availability, test success and failure, response time, failed test runs, and performance trends for HTTP/API and browser-based synthetic tests.
+
+Where supported, include:
+- overall availability
+- test success rate
+- test failure rate
+- response time
+- p95 response time
+- failed tests by test name
+- failures by synthetic location
+- HTTP status or response-code breakdown
+- browser test performance
+- DNS, connection, TLS, server, or page-load timing components where the selected synthetic telemetry genuinely exposes them
+
+Add filters for synthetic test, test type, location, and environment only where those exact properties are supported by the selected telemetry.
+
+Do not invent synthetic metrics, dimensions, test states, timing phases, units, aggregation semantics, availability formulas, or percentile semantics.
+
+Do not assume that a concept visible in the Splunk Synthetic Monitoring product automatically has a metric available for dashboard SignalFlow.
+
+If a requested panel cannot be verified from available Splunk Observability Cloud telemetry or authoritative documentation, keep it in the dashboard design, mark it UNVERIFIED, and omit deployable Terraform and speculative SignalFlow for it.
+
+Do not publish or apply anything. Generate only.
+```
+
+### Expected behavior
+
+The skill should:
+
+1. Trigger automatically for a Synthetic Monitoring dashboard request.
+2. Remain in Generate mode.
+3. Perform telemetry discovery before generating Synthetic Monitoring SignalFlow.
+4. Distinguish product UI concepts and test-result fields from SignalFlow metric time series.
+5. Verify metric names, types, units, dimensions, aggregation semantics, run semantics, and time-window behavior.
+6. Not infer availability, success rate, failure rate, or historical run counts from `synthetics.run.count` without supporting evidence.
+7. Not assume `test_id` is a test-name dimension.
+8. Verify location semantics before grouping or filtering by location.
+9. Generate test-type and environment filters only when their exact properties are verified.
+10. Generate p95 only when percentile or distribution semantics are verified.
+11. Keep browser and API telemetry semantics separate unless compatibility is verified.
+12. Not invent DNS, connection, TLS, server, page-load, or HTTP response-code telemetry.
+13. Preserve unsupported requested panels in the design as `UNVERIFIED`.
+14. Omit speculative SignalFlow and deployable Terraform resources for `UNVERIFIED` panels.
+15. Verify Terraform resource attributes against a provider version compatible with the repository provider strategy.
+16. Prefer a warning-only or partial dashboard shell over fabricated monitoring charts.
+17. Report final status truthfully as `GENERATED`.
+18. Not run Terraform validation, planning, runtime SignalFlow, publish, apply, or Splunk write operations.
+
+### Failure conditions
+
+Fail the test if Copilot:
+
+- fabricates Synthetic Monitoring metrics or dimensions
+- treats product-visible fields as proof of SignalFlow availability
+- derives availability or success/failure rates without verified run semantics
+- treats `synthetics.run.count` as a historical time-window counter without evidence
+- presents `test_id` as test name without verification
+- invents test-type or environment properties
+- fabricates percentile semantics
+- invents DNS, connection, TLS, server, page-load, or response-code telemetry
+- mixes browser and API semantics without verification
+- generates deployable Terraform for unresolved telemetry
+- runs validation or runtime SignalFlow in Generate mode
 - publishes or applies anything
