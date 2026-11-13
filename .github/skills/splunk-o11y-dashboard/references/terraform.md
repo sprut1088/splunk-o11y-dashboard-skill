@@ -23,6 +23,26 @@ Use this reference whenever generating, reviewing, validating, or troubleshootin
 
 Apply this gate before generating any `splunk-terraform/signalfx` resource.
 
+### Match schema verification to the repository provider version
+
+When an existing repository declares a provider version constraint or lock-file version, treat that version strategy as the schema target.
+
+Before generating any Terraform resource:
+
+1. identify the repository's existing provider constraint or locked version
+2. verify the generated resource type and every generated attribute against a provider version compatible with that strategy
+3. do not treat documentation for the latest provider release as sufficient evidence for an older repository constraint
+4. do not assume that basic or commonly used attributes are unchanged across provider versions
+5. if compatible-version schema evidence cannot be established, mark provider-schema compatibility `UNVERIFIED`
+
+If provider-schema compatibility is `UNVERIFIED`:
+
+- do not claim the Terraform resource is schema-verified
+- omit any resource or attribute whose availability cannot be established for the repository's provider version
+- preserve the intended dashboard component in the design and state that provider-version compatibility is the blocker
+
+For example, if the repository uses `~> 9.3.0`, documentation for provider v9.36 does not by itself verify resources or attributes for the repository.
+
 ### Verify the resource schema before generating attributes
 
 Treat each Terraform resource independently.

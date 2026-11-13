@@ -72,6 +72,7 @@ Treat the following rules as non-negotiable before generating Terraform, REST pa
    - For Kubernetes, AKS, EKS, GKE, OpenShift, pod, container, node, namespace, or workload dashboards, read `references/kubernetes.md` before selecting metrics, dimensions, aggregations, or generating SignalFlow.
    - For Kubernetes telemetry, distinguish metrics supported by an OpenTelemetry receiver from metrics actually exported to Splunk Observability Cloud. Receiver documentation alone is not proof that a metric is available in the target Splunk environment.
    - For Azure infrastructure, Azure Monitor, Application Gateway, Azure Firewall, ExpressRoute, Load Balancer, virtual machine, subscription, resource-group, region, or Azure resource dashboards, read `references/azure.md` before selecting metrics, dimensions, variables, aggregations, or generating SignalFlow.
+   - For RUM, Real User Monitoring, Digital Experience, mobile application, web frontend, session, crash, app-start, screen, route, browser, device, or frontend performance dashboards, read `references/rum.md` before selecting metrics, dimensions, variables, aggregations, percentile logic, or generating SignalFlow.
 
 2. Prefer Splunk APM-native telemetry for Splunk APM dashboards.
    - Consider documented Monitoring MetricSets such as:
@@ -489,3 +490,4 @@ Use [references/rest-api.md](references/rest-api.md) whenever REST API output, r
 Use [references/input-spec.md](references/input-spec.md) whenever interpreting structured YAML/JSON input or mapping natural-language requirements into a dashboard specification.
 Use [references/output-contract.md](references/output-contract.md) whenever formatting the final response, reporting preflight findings, telemetry status, validation status, unresolved panels, or publish/apply status.
 Use [references/acceptance-tests.md](references/acceptance-tests.md) when regression-testing or evaluating this skill against the maintained acceptance scenarios.
+Use [references/rum.md](references/rum.md) whenever generating or reviewing RUM, Real User Monitoring, Digital Experience, mobile, web frontend, session, crash, app-start, screen, route, browser, device, or frontend-performance dashboards. Use it to verify RUM metric type and aggregation semantics, preserve platform-specific definitions, validate application scoping and filters, and prevent unsafe percentile or cross-series aggregation.

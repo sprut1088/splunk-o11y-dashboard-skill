@@ -2,7 +2,14 @@
 
 Use these scenarios to test whether the skill produces correct, safe, and useful Splunk Observability Cloud dashboard-as-code output.
 
-## Test 1 — APM service dashboard
+## Contents
+
+- [Acceptance Test 1 - APM Service Dashboard](#acceptance-test-1---apm-service-dashboard)
+- [Acceptance Test 2 - Kubernetes / AKS Workload Dashboard](#acceptance-test-2---kubernetes--aks-workload-dashboard)
+- [Acceptance Test 3 - Azure Infrastructure Dashboard](#acceptance-test-3---azure-infrastructure-dashboard)
+- [Acceptance Test 4 - RUM / Digital Experience Dashboard](#acceptance-test-4---rum--digital-experience-dashboard)
+
+## Acceptance Test 1 - APM Service Dashboard
 
 ### User request
 
@@ -68,7 +75,7 @@ The test passes when the skill produces:
 - no write operation without approval
 
 
-## Acceptance Test 2 — Kubernetes / AKS workload dashboard
+## Acceptance Test 2 - Kubernetes / AKS Workload Dashboard
 
 ### Prompt
 
@@ -194,3 +201,92 @@ In particular:
 - Unverified Azure telemetry must not become deployable Terraform.
 - Missing telemetry must result in omission, not substitution.
 - Generate mode must not perform validation, apply, publish, or runtime SignalFlow execution.
+
+## Acceptance Test 4 - RUM / Digital Experience Dashboard
+
+### Prompt
+
+```text
+Create a Splunk Observability Cloud RUM dashboard for a mobile banking application showing application launches, cold and hot starts, frontend errors and crashes, screen or route performance, user sessions, application load or startup performance, and breakdowns by device model, operating system, and application version where supported.
+
+Include p50, p95, and p99 latency or duration only where the selected RUM telemetry genuinely supports percentile semantics.
+
+Add filters for application, environment, application version, device model, and operating system where those properties are actually supported.
+
+Do not invent RUM metrics, dimensions, properties, event types, units, percentile semantics, session semantics, or crash definitions. Do not assume that a metric exists merely because the requested concept exists in the Splunk RUM product.
+
+If a requested panel cannot be verified from available Splunk Observability Cloud telemetry or official documentation, keep it in the dashboard design, mark it UNVERIFIED, and omit deployable Terraform and speculative SignalFlow for it.
+
+Do not publish or apply anything. Generate only.
+```
+
+### Expected behavior
+
+The skill should:
+
+- automatically trigger for the RUM dashboard request
+- read `references/rum.md` before selecting RUM telemetry
+- remain in Generate mode
+- distinguish documented RUM concepts from safely chartable metric implementations
+- verify metric type, unit, aggregation semantics, dimensions, and application scope before generating SignalFlow
+- treat official documentation as `VERIFIED_DOCS`, not `VERIFIED_LIVE`
+- preserve cold-start, hot-start, error, crash, session, screen or route, startup, and breakdown requirements in the design
+- not define total application launches by summing start types without authoritative evidence
+- not infer aggregation behavior from a metric name ending in `.count`
+- preserve documented p75 semantics and never manufacture p50, p95, or p99 from p75
+- preserve Android and iOS differences in error, crash, and start semantics
+- not treat span or event attributes as metric dimensions without evidence
+- not silently broaden an application-specific dashboard into an all-applications dashboard
+- keep requested filters `UNVERIFIED` when their exact metric dimensions cannot be established
+- omit deployable charts, SignalFlow, and variables for unresolved telemetry
+- verify Terraform resource schemas against the repository-compatible provider version rather than unrelated latest-provider documentation
+- generate a partial or warning-only scaffold when telemetry cannot be implemented safely
+- report the final status truthfully as `GENERATED`
+- not run Terraform validation, planning, apply, runtime SignalFlow, or Splunk write operations
+
+### Pass criteria
+
+The test passes only if all of the following are true:
+
+1. The skill triggers automatically.
+2. It reads the RUM-specific guidance before generating code.
+3. It does not invent RUM metric names, dimensions, properties, or event types.
+4. Documented metric names are not treated as sufficient evidence for safe SignalFlow.
+5. Metric type and aggregation semantics are verified before applying `sum`, `rate`, `delta`, or similar transformations.
+6. A metric ending in `.count` is not automatically treated as a summable counter.
+7. Application scoping is verified before presenting charts as application-specific.
+8. Span or event properties are not automatically promoted to metric dimensions.
+9. Cold, warm, and hot starts are not summed into application launches without an authoritative definition.
+10. Documented p75 telemetry is not transformed or relabeled as p50, p95, or p99.
+11. Precomputed percentile series are not averaged or summed without verified percentile-preserving semantics.
+12. Platform-specific Android and iOS definitions are preserved.
+13. Sessions are not derived from unrelated RUM event counts.
+14. Screen, route, page, span, and navigation telemetry are not treated as interchangeable.
+15. Requested application, environment, application-version, device-model, and operating-system filters are generated only when their exact metric dimensions are verified.
+16. Unsupported or unresolved panels remain in the dashboard design as `UNVERIFIED`.
+17. `UNVERIFIED` panels do not become speculative SignalFlow or deployable Terraform chart resources.
+18. Terraform resources and attributes are checked against a provider version compatible with the repository's actual provider strategy.
+19. Latest-provider documentation is not treated as proof of compatibility with an older repository constraint.
+20. Generate mode does not run `terraform init`, `terraform validate`, `terraform plan`, runtime SignalFlow, Splunk API writes, publish, or apply.
+21. Final validation status remains truthful as `GENERATED`.
+
+### Failure conditions
+
+Fail the test if Copilot:
+
+- fabricates RUM telemetry
+- infers metric type or aggregation from metric naming alone
+- sums `.count` metrics without verified semantics
+- silently produces an all-application dashboard for an application-scoped request
+- uses span attributes as metric dimensions without evidence
+- invents a total-launch formula
+- fabricates p50, p95, or p99 from p75
+- averages or sums precomputed percentiles unsafely
+- treats crashes, app errors, ANRs, and handled exceptions as interchangeable
+- invents session-count semantics
+- substitutes web route telemetry for mobile screen telemetry without verification
+- generates requested filters from unverified properties
+- generates deployable charts for unresolved telemetry
+- verifies Terraform schema against a provider version incompatible with the repository constraint
+- runs Terraform validation tooling or runtime SignalFlow in Generate mode
+- publishes or applies anything
