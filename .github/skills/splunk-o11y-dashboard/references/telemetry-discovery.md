@@ -148,6 +148,12 @@ Current Splunk APM histogram Monitoring MetricSets can expose dimensions such as
 
 Availability varies by Monitoring MetricSet.
 
+Treat the names above as candidates, not defaults. For the selected Splunk APM Monitoring MetricSet, verify the exact service and environment property before generating a filter or dashboard variable.
+
+`service.name` and `sf_service` are not interchangeable by assumption. `deployment.environment`, `sf_environment`, and any other environment property are not interchangeable by assumption.
+
+If the exact APM service or environment property cannot be tied to the selected Monitoring MetricSet through live telemetry, supplied inventory, or authoritative documentation for that metricset, mark that filter or variable `UNVERIFIED` and omit it from deployable Terraform.
+
 Do not automatically replace a requested property such as `environment` with a generic OpenTelemetry property such as `deployment.environment.name`.
 
 Resolve the property using the target Splunk APM telemetry model.

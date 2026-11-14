@@ -84,7 +84,7 @@ resource "signalfx_dashboard" "example" {
   # ...
 
   variable {
-    property = "service.name"
+    property = "<verified-service-property>"
     alias    = "Service"
   }
 }
@@ -164,7 +164,7 @@ Do not invent environment values.
 If the user requests both:
 
 - a dashboard for service `payments`
-- a `service.name` dashboard variable
+- a service dashboard variable whose exact telemetry property is verified
 
 preserve the user's intent carefully.
 
@@ -178,7 +178,7 @@ For example, if the dashboard contains:
 
 ```hcl
 variable {
-  property = "service.name"
+  property = "<verified-service-property>"
   alias    = "Service"
 }
 ```
@@ -186,7 +186,7 @@ variable {
 and the purpose of that variable is to switch services, do not generate every chart with:
 
 ```python
-filter('service.name', 'payments')
+filter('<verified-service-property>', 'payments')
 ```
 
 because the chart remains permanently scoped to `payments`.
@@ -194,19 +194,23 @@ because the chart remains permanently scoped to `payments`.
 Choose one of these patterns deliberately:
 
 1. **Dedicated service dashboard**
-   - use `service.name = payments` as a fixed dashboard scope
-   - do not expose `service.name` as a service-switching variable
+   - use the verified service property with value `payments` as the fixed dashboard scope
+   - do not expose that same verified service property as a service-switching variable
 
 2. **Reusable service dashboard**
-   - expose `service.name` as a dashboard variable
+   - expose the verified service property as a dashboard variable
    - ensure chart filtering is compatible with that variable mechanism
    - do not hard-code `payments` inside each chart
 
-If the user's request contains both a named service and a requested `service.name` filter, prefer the reusable variable interpretation unless the user explicitly states that the dashboard must be permanently locked to that service.
+If the user's request contains both a named service and a requested service filter, prefer the reusable variable interpretation only after the exact service property for the selected telemetry has been verified, unless the user explicitly states that the dashboard must be permanently locked to that service.
 
 The supplied service name may be documented as the intended initial context, but do not invent an unsupported default-value attribute merely to preselect it.
 
 Before finalizing Terraform, verify that every dashboard variable can actually affect the charts it is intended to control.
+
+For Splunk APM dashboards, semantic intent such as service or environment is not sufficient evidence for a property name. Do not choose `service.name`, `deployment.environment`, `sf_service`, `sf_environment`, or another candidate until the exact property is verified for the selected Monitoring MetricSet.
+
+If the exact service or environment property is unresolved, keep the requested filter in the dashboard design as `UNVERIFIED` and omit the corresponding dashboard variable or filter from deployable Terraform.
 
 ### Dashboard URL
 
@@ -415,7 +419,7 @@ Example:
 
 ```hcl
 filter {
-  property = "service.name"
+  property = "<verified-service-property>"
   values   = ["payments"]
 }
 ```
@@ -444,7 +448,7 @@ Example:
 
 ```hcl
 variable {
-  property = "service.name"
+  property = "<verified-service-property>"
   alias    = "Service"
 }
 ```

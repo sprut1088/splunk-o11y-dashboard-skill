@@ -557,3 +557,118 @@ Fail the test if Copilot:
 - verifies Terraform schema against an incompatible provider version
 - runs Terraform validation tooling or runtime SignalFlow in Generate mode
 - publishes or applies anything
+
+
+## Acceptance Test 8 - Validate Mode APM Service Dashboard
+
+### User request
+
+```text
+Create and validate a Splunk Observability Cloud APM service dashboard for the service `payments`.
+
+Use Validate mode.
+
+Show, where supported and verified:
+
+- request rate
+- error rate
+- request count
+- p50 latency
+- p95 latency
+- p99 latency
+- top endpoints by request rate
+- top endpoints by error rate
+- top endpoints by latency
+
+Add dashboard filters for service and environment only where the exact properties are supported by the selected APM telemetry.
+
+Use Splunk APM-native metric telemetry where appropriate. Do not substitute generic OpenTelemetry metrics for Splunk APM metricsets unless that telemetry is explicitly verified as the intended source.
+
+For Splunk APM histogram metricsets, preserve the distinction between histogram count, request rate, and latency percentile semantics.
+
+Do not treat request count as request rate.
+
+Do not invent metric names, dimensions, units, provider attributes, SignalFlow methods, aggregation semantics, filters, or dashboard-variable attributes.
+
+Protect Splunk APM default metricsets from accidental mixing with dimensionalized/custom metricsets unless the selected metricset or live evidence explicitly requires otherwise.
+
+Do not hardcode the `payments` service into every chart if the dashboard is intended to remain reusable through a service dashboard variable.
+
+Do not add a fixed service filter that contradicts the same interactive dashboard variable.
+
+Verify the exact latency unit before assigning a display unit or applying any conversion.
+
+If any requested panel cannot be safely verified, retain it in the dashboard design, mark it UNVERIFIED, and omit speculative SignalFlow and deployable Terraform for that panel.
+
+The repository already defines the Terraform provider version constraint. Use the provider version compatible with the repository rather than assuming the latest provider schema.
+
+Because this is Validate mode:
+
+- generate the Terraform dashboard code
+- perform non-destructive local validation appropriate to the generated Terraform
+- Terraform initialization required solely for validation may use backend-disabled/non-destructive initialization
+- do not run terraform plan
+- do not apply anything
+- do not publish anything
+- do not make Splunk API write calls
+- do not create, update, or delete any remote Splunk resource
+- do not execute generated SignalFlow against a live Splunk organization
+- report exactly which validation commands were executed
+- distinguish GENERATED, STATICALLY_VALIDATED, and any validation that could not be completed
+- do not claim PLAN_VALIDATED or APPLIED
+
+If provider initialization or validation cannot complete because of network, credentials, provider availability, or environment limitations, report that truthfully rather than treating the dashboard as fully validated.
+
+Return the dashboard design, telemetry preflight, generated Terraform, validation results, unresolved assumptions, and final validation status.
+```
+
+### Expected behavior
+
+The skill should:
+
+1. Trigger automatically for Splunk APM dashboard requests.
+2. Enter Validate mode rather than Generate or Publish mode.
+3. Perform telemetry discovery before generating SignalFlow.
+4. Prefer Splunk APM-native Monitoring MetricSet telemetry over generic OpenTelemetry metrics when appropriate.
+5. Treat `service.request` as a histogram Monitoring MetricSet when that telemetry is selected.
+6. Preserve the distinction between histogram count, request rate, and latency percentile semantics.
+7. Protect default APM Monitoring MetricSets from accidental mixing with dimensionalized/custom MetricSets.
+8. Verify the exact service and environment properties for the selected Monitoring MetricSet before generating dashboard variables or filters.
+9. Treat `service.name`, `sf_service`, `deployment.environment`, and `sf_environment` as candidates rather than interchangeable defaults.
+10. Not infer an APM metric dimension merely because the same property exists on spans, resources, or generic OpenTelemetry telemetry.
+11. Mark unresolved service or environment filters as `UNVERIFIED` and omit their Terraform variable or filter blocks.
+12. Keep the supplied service name `payments` as context or a verified variable value without hard-coding it into every chart when the dashboard is reusable.
+13. Not combine a fixed service filter with an interactive variable for the same property unless explicitly required.
+14. Verify latency units before assigning display units or conversions.
+15. Retain unsupported requested panels in the dashboard design as `UNVERIFIED`.
+16. Omit speculative SignalFlow and deployable Terraform for every `UNVERIFIED` panel.
+17. Use a Terraform provider version compatible with the repository constraint.
+18. Run only non-destructive validation operations appropriate to Validate mode.
+19. Permit backend-disabled Terraform initialization solely for validation.
+20. Not run terraform plan, apply, publish, Splunk write calls, or live SignalFlow execution.
+21. Report every validation command that was executed and its result.
+22. Report provider or environment validation failures truthfully.
+23. Claim `STATICALLY_VALIDATED` only if provider-backed Terraform validation actually completes successfully.
+24. Never claim `PLAN_VALIDATED` or `APPLIED` in this test.
+
+### Failure conditions
+
+Fail the test if Copilot:
+
+- invents APM metric names, dimensions, units, provider attributes, or SignalFlow semantics
+- substitutes generic OpenTelemetry metrics for Splunk APM Monitoring MetricSets without verified intent
+- treats request count as request rate
+- generates latency percentiles without verifying the source unit and percentile semantics
+- mixes default and dimensionalized/custom APM MetricSets unintentionally
+- assumes `service.name`, `sf_service`, `deployment.environment`, or `sf_environment` without tying the exact property to the selected telemetry
+- treats span or resource attributes as proof of metric dimensions
+- generates an unverified service or environment dashboard variable
+- hard-codes `payments` into charts while also exposing a conflicting reusable service variable
+- generates deployable Terraform or speculative SignalFlow for unresolved panels
+- validates against an incompatible Terraform provider version
+- runs terraform plan
+- applies or publishes anything
+- makes Splunk API write calls
+- executes generated SignalFlow against a live Splunk organization
+- reports `STATICALLY_VALIDATED` when provider validation did not complete
+- claims `PLAN_VALIDATED` or `APPLIED`
