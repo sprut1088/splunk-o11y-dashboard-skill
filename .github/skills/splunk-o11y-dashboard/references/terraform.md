@@ -208,6 +208,12 @@ The supplied service name may be documented as the intended initial context, but
 
 Before finalizing Terraform, verify that every dashboard variable can actually affect the charts it is intended to control.
 
+Verifying the telemetry property name is necessary but not sufficient. Also verify that the selected Splunk dashboard/provider variable or filter mechanism is documented to constrain the generated chart type and SignalFlow program as intended.
+
+For example, do not generate a `service.name`, `sf_service`, `deployment.environment`, `sf_environment`, or other dashboard variable merely because that property exists on the selected Monitoring MetricSet. Verify that the dashboard variable/filter mechanism actually applies that property constraint to the generated `histogram()`, `data()`, or other SignalFlow chart.
+
+If that variable-to-chart behavior cannot be verified from the compatible provider schema, authoritative Splunk dashboard documentation, supplied repository evidence, or a safe read-only inspection of an existing working dashboard, keep the requested dashboard filter in the design as `UNVERIFIED` and omit the corresponding variable or filter block from deployable Terraform.
+
 For Splunk APM dashboards, semantic intent such as service or environment is not sufficient evidence for a property name. Do not choose `service.name`, `deployment.environment`, `sf_service`, `sf_environment`, or another candidate until the exact property is verified for the selected Monitoring MetricSet.
 
 If the exact service or environment property is unresolved, keep the requested filter in the dashboard design as `UNVERIFIED` and omit the corresponding dashboard variable or filter from deployable Terraform.

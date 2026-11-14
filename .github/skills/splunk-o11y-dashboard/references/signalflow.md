@@ -115,6 +115,30 @@ base_filter = (
 )
 ```
 
+### APM error classification
+
+For Splunk APM `service.request`, do not infer error semantics by negating a non-error value.
+
+Use an explicitly verified positive error selector for the numerator of an error-rate calculation, such as:
+
+```python
+filter('sf_error', 'true')
+```
+
+when that value is verified by current Splunk documentation, Splunk-maintained SignalFlow library evidence, supplied inventory, or live telemetry.
+
+Do not generate logic such as:
+
+```python
+not filter('sf_error', 'false')
+```
+
+as a substitute for a verified positive error selector. Missing, unset, unknown, or differently encoded values must not be silently classified as errors.
+
+If the exact positive error value or error-rate semantics cannot be verified, keep Error Rate in the dashboard design as `UNVERIFIED` and omit speculative SignalFlow and deployable Terraform.
+
+Prefer the exact APM helper or maintained SignalFlow definition that establishes `sf_error` semantics rather than inferring behavior from unrelated examples.
+
 Apply this rule to default APM histogram MMS such as:
 
 - `service.request`
