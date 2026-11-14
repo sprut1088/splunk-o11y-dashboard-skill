@@ -1,5 +1,21 @@
 # Telemetry Discovery and Validation
 
+## Table of Contents
+
+- [Source priority](#source-priority)
+- [Validation status](#validation-status)
+- [Metric rules](#metric-rules)
+- [Dimension and property rules](#dimension-and-property-rules)
+- [Live discovery rules](#live-discovery-rules)
+- [Inventory rules](#inventory-rules)
+- [Documentation fallback](#documentation-fallback)
+- [Failure behavior](#failure-behavior)
+- [Preflight summary](#preflight-summary)
+- [Splunk APM telemetry preference](#splunk-apm-telemetry-preference)
+  - [Splunk APM Monitoring MetricSets](#splunk-apm-monitoring-metricsets)
+  - [APM dimensions](#apm-dimensions)
+  - [Raw OpenTelemetry metrics](#raw-opentelemetry-metrics)
+
 Use this reference whenever selecting metrics, dimensions, properties, services, environments, hosts, Kubernetes resources, cloud resources, or other telemetry for a dashboard.
 
 ## Source priority

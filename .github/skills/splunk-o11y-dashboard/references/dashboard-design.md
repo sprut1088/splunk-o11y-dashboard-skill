@@ -1,5 +1,22 @@
 # Splunk Observability Cloud Dashboard Design
 
+## Table of Contents
+
+- [Design principle](#design-principle)
+- [Dashboard hierarchy](#dashboard-hierarchy)
+- [Audience](#audience)
+- [Chart selection](#chart-selection)
+- [APM service dashboard pattern](#apm-service-dashboard-pattern)
+- [Dashboard variables](#dashboard-variables)
+- [Filters](#filters)
+- [Cardinality](#cardinality)
+- [Layout](#layout)
+- [Terraform layout](#terraform-layout)
+- [New and classic dashboard experiences](#new-and-classic-dashboard-experiences)
+- [Panel naming](#panel-naming)
+- [Dashboard quality check](#dashboard-quality-check)
+
+
 Use this reference when deciding dashboard structure, chart selection, layout, variables, filters, and information hierarchy.
 
 ## Design principle
