@@ -412,6 +412,30 @@ For cumulative counters, determine whether the user needs the change between mea
 
 Do not treat a cumulative counter as an ordinary gauge.
 
+### Per-second rates from cumulative counters
+
+Do not equate cumulative-counter Delta semantics with a per-second rate.
+
+Splunk Observability Cloud normally uses Delta as the default rollup for cumulative counters. Delta represents change between values over the applicable interval; it does not by itself prove that the resulting value has `/second` units.
+
+Before labeling a cumulative counter as bytes/s, operations/s, requests/s, packets/s, or another per-second quantity:
+
+1. verify that the selected metric is actually a cumulative counter
+2. verify the exact SignalFlow conversion that produces a per-second value for that metric
+3. verify whether metric-type rollup has already transformed the cumulative stream before any analytics function is applied
+4. verify the resulting unit after transformation
+
+Do not assume that `rollup='rate'` is valid for a cumulative counter merely because a Rate/sec rollup exists for other metric types or appears in an example.
+
+SignalFlow `rateofchange()` calculates the difference between consecutive values and divides by elapsed seconds, but do not apply `rateofchange()` automatically to a cumulative-counter stream. First verify the metric pipeline and operation order so that an already-delta-transformed stream is not differentiated again.
+
+If the exact cumulative-counter-to-per-second transformation cannot be established from authoritative documentation, live metadata, inventory, or a validated SignalFlow pattern:
+
+- keep the requested throughput or operations-per-second panel in the dashboard design
+- mark its implementation `UNVERIFIED`
+- omit speculative SignalFlow and deployable Terraform for that panel
+- do not relabel Delta values as `/s`
+
 ### Count
 
 Be explicit about what `count()` represents.

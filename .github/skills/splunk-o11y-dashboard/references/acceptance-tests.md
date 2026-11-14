@@ -9,6 +9,7 @@ Use these scenarios to test whether the skill produces correct, safe, and useful
 - [Acceptance Test 3 - Azure Infrastructure Dashboard](#acceptance-test-3---azure-infrastructure-dashboard)
 - [Acceptance Test 4 - RUM / Digital Experience Dashboard](#acceptance-test-4---rum--digital-experience-dashboard)
 - [Acceptance Test 5 - Synthetic Monitoring Dashboard](#acceptance-test-5---synthetic-monitoring-dashboard)
+- [Acceptance Test 6 - Host / VM Infrastructure Dashboard](#acceptance-test-6---host--vm-infrastructure-dashboard)
 
 ## Acceptance Test 1 - APM Service Dashboard
 
@@ -360,4 +361,93 @@ Fail the test if Copilot:
 - mixes browser and API semantics without verification
 - generates deployable Terraform for unresolved telemetry
 - runs validation or runtime SignalFlow in Generate mode
+- publishes or applies anything
+
+## Acceptance Test 6 - Host / VM Infrastructure Dashboard
+
+### User request
+
+```text
+Create a Splunk Observability Cloud infrastructure dashboard for Linux and Windows hosts or virtual machines.
+
+Show, where supported:
+
+- host availability or host reporting status
+- CPU utilization
+- memory utilization
+- memory used and available
+- filesystem or disk-space utilization
+- disk read and write throughput
+- disk read and write operations
+- network receive and transmit throughput
+- swap usage or swap activity
+- load average for platforms where it is meaningful
+- top hosts by CPU utilization
+- top hosts by memory utilization
+- top filesystems by utilization
+
+Add filters for host, operating system, environment, cloud provider, region, and availability zone only where those exact properties are supported by the selected telemetry.
+
+The dashboard should work across multiple hosts and must preserve host-level grouping when showing per-host health or resource usage.
+
+Do not invent host metrics, dimensions, units, metric types, aggregation semantics, filesystem properties, cloud metadata, availability definitions, or rate conversions.
+
+Do not assume that similarly named OpenTelemetry host metrics and Splunk Observability Cloud metrics are interchangeable. Verify the metric actually available to the target dashboard telemetry and preserve its documented semantics.
+
+For cumulative disk, network, paging, or other counters, do not display the raw cumulative value as throughput or operations per second. Apply a rate only when the metric type and intended transformation are verified.
+
+Do not sum utilization percentages across hosts, CPU cores, filesystems, disks, or network interfaces unless that aggregation is explicitly valid for the selected telemetry.
+
+If a requested panel cannot be verified from available telemetry or authoritative documentation, retain it in the dashboard design, mark it UNVERIFIED, and omit deployable Terraform and speculative SignalFlow for that panel.
+
+Do not publish or apply anything. Generate only.
+```
+
+### Expected behavior
+
+The skill should:
+
+1. Trigger automatically for Linux, Windows, host, VM, or generic infrastructure dashboard requests.
+2. Read `references/host-infrastructure.md` before selecting host metrics, dimensions, aggregations, or rate transformations.
+3. Remain in Generate mode.
+4. Perform telemetry discovery before generating SignalFlow.
+5. Preserve host-level grouping for per-host health and utilization panels.
+6. Verify host identity such as `host.name` rather than assuming host uniqueness or naming semantics.
+7. Not sum utilization percentages across hosts, cores, filesystems, disks, or interfaces.
+8. Verify host-level CPU aggregation semantics before averaging per-core series.
+9. Keep host availability distinct from merely counting hosts currently reporting telemetry.
+10. Not substitute free memory for available memory.
+11. Preserve platform-specific Linux and Windows memory semantics.
+12. Verify filesystem identity and aggregation semantics before generating filesystem panels.
+13. Treat cumulative disk, network, paging, and similar counters conservatively.
+14. Not convert cumulative counters to bytes/s, operations/s, packets/s, pages/s, throughput, or IOPS unless the exact SignalFlow transformation and resulting unit are authoritatively verified.
+15. Not assume `rollup='rate'`, `rateofchange()`, `delta()`, or resolution-based division is valid for cumulative counters.
+16. Keep unresolved throughput, operations, swap, paging, availability, or memory-available panels in the design as `UNVERIFIED`.
+17. Omit speculative SignalFlow and deployable Terraform for all `UNVERIFIED` panels.
+18. Generate host, operating-system, cloud-provider, region, and availability-zone filters only when those exact properties are verified.
+19. Not invent an environment property.
+20. Verify Terraform resource attributes against a provider version compatible with the repository constraint.
+21. Preserve a non-overlapping 12-column layout.
+22. Report final status truthfully as `GENERATED`.
+23. Not run Terraform init, validate, plan, runtime SignalFlow, publish, apply, or Splunk write operations.
+
+### Failure conditions
+
+Fail the test if Copilot:
+
+- fabricates host metrics, dimensions, cloud metadata, filesystem properties, or units
+- treats OpenTelemetry receiver support as proof that a metric reaches Splunk Observability Cloud
+- collapses multiple hosts into an unintended fleet aggregate
+- sums host, CPU, filesystem, disk, or interface utilization percentages
+- assumes per-core CPU averages are automatically valid host utilization
+- labels currently reporting hosts as availability or uptime without an availability definition
+- substitutes free memory for available memory
+- assumes Linux and Windows memory telemetry is interchangeable
+- generates bytes/s, operations/s, packets/s, pages/s, throughput, or IOPS from cumulative counters without verified conversion semantics
+- uses `rollup='rate'`, `rateofchange()`, `delta()`, or resolution-based division speculatively
+- invents swap or paging semantics
+- invents environment or cloud filter properties
+- generates deployable Terraform for unresolved telemetry
+- verifies Terraform schema against an incompatible provider version
+- runs Terraform validation tooling or runtime SignalFlow in Generate mode
 - publishes or applies anything
