@@ -10,6 +10,7 @@ Use these scenarios to test whether the skill produces correct, safe, and useful
 - [Acceptance Test 4 - RUM / Digital Experience Dashboard](#acceptance-test-4---rum--digital-experience-dashboard)
 - [Acceptance Test 5 - Synthetic Monitoring Dashboard](#acceptance-test-5---synthetic-monitoring-dashboard)
 - [Acceptance Test 6 - Host / VM Infrastructure Dashboard](#acceptance-test-6---host--vm-infrastructure-dashboard)
+- [Acceptance Test 7 - Database Monitoring Dashboard](#acceptance-test-7---database-monitoring-dashboard)
 
 ## Acceptance Test 1 - APM Service Dashboard
 
@@ -448,6 +449,111 @@ Fail the test if Copilot:
 - invents swap or paging semantics
 - invents environment or cloud filter properties
 - generates deployable Terraform for unresolved telemetry
+- verifies Terraform schema against an incompatible provider version
+- runs Terraform validation tooling or runtime SignalFlow in Generate mode
+- publishes or applies anything
+
+
+## Acceptance Test 7 - Database Monitoring Dashboard
+
+### User request
+
+```text
+Create a Splunk Observability Cloud database monitoring dashboard for PostgreSQL, Oracle, SQL Server, MySQL, or other database technologies only where the selected telemetry actually supports them.
+
+Show, where supported:
+
+- database availability or reporting status
+- active connections
+- connection utilization
+- query throughput
+- transaction throughput
+- query latency
+- slow queries
+- query errors or failures
+- lock activity or lock waits
+- deadlocks
+- database CPU utilization
+- database memory utilization
+- storage or tablespace utilization
+- disk or I/O activity
+- cache or buffer hit ratio
+- replication health or replication lag
+- top database instances by utilization
+- top databases by query latency
+- top queries by latency or execution time
+
+Add filters for database instance, database name, database technology or type, host, environment, region, and cloud provider only where those exact properties are supported by the selected telemetry.
+
+The dashboard may need to work across multiple database technologies. Do not assume that PostgreSQL, Oracle, SQL Server, MySQL, OpenTelemetry database metrics, Splunk Database Monitoring telemetry, infrastructure metrics, APM spans, and cloud-provider database metrics use interchangeable metric names, dimensions, units, or semantics.
+
+Do not invent database metrics, dimensions, database identifiers, query identifiers, units, metric types, aggregation semantics, availability definitions, transaction semantics, query-count semantics, latency semantics, lock semantics, replication semantics, cache-hit formulas, storage semantics, or rate conversions.
+
+Do not derive a database availability percentage merely from the presence of telemetry unless the availability definition and expected reporting population are verified.
+
+Do not calculate query rate, transaction rate, IOPS, bytes per second, or other per-second values from cumulative counters unless the exact metric type and SignalFlow transformation are verified.
+
+Do not derive cache hit ratio, connection utilization, storage utilization, or replication health from component metrics unless the formula and component semantics are verified for that database technology.
+
+Do not aggregate latency, utilization percentages, cache-hit percentages, or replication lag across unrelated database instances unless that aggregation preserves the requested meaning.
+
+If query-level telemetry contains sensitive SQL text, database names, users, parameters, literals, or other potentially sensitive values, do not expose them in generated dashboard labels or filters unless explicitly requested and supported by the supplied telemetry.
+
+If a requested panel cannot be verified from available telemetry or authoritative documentation, retain it in the dashboard design, mark it UNVERIFIED, and omit deployable Terraform and speculative SignalFlow for that panel.
+
+Do not publish or apply anything. Generate only.
+```
+
+### Expected behavior
+
+The skill should:
+
+1. Trigger automatically for database monitoring dashboard requests.
+2. Remain in Generate mode.
+3. Perform telemetry discovery before generating SignalFlow.
+4. Keep PostgreSQL, Oracle, SQL Server, MySQL, OpenTelemetry receiver telemetry, Splunk database telemetry, APM spans, infrastructure metrics, and cloud-provider database metrics semantically distinct.
+5. Treat receiver or vendor documentation as candidate evidence, not proof that telemetry exists in the target Splunk organization.
+6. Verify final metric name, metric type, unit, temporality, dimensions, database identity, and aggregation semantics before generating a panel.
+7. Not derive availability from telemetry presence unless the availability definition, freshness window, expected reporting population, and database identity are verified.
+8. Not present a backend-process count as active client connections unless connection-state and process-scope semantics are verified.
+9. Verify connection-utilization formulas, compatible numerator and denominator scopes, units, reserved capacity, and zero or missing denominator behavior.
+10. Verify query and transaction counting semantics before presenting counts or throughput.
+11. Not convert cumulative counters to query/s, transactions/s, IOPS, bytes/s, or other per-second values unless the exact transformation and resulting unit are verified.
+12. Verify query-latency measurement boundaries, source units, statistic or distribution semantics, percentile semantics, and database-instance scope.
+13. Keep held locks, requested locks, lock waits, wait duration, and deadlocks semantically distinct.
+14. Verify database CPU, memory, storage, tablespace, and I/O attribution rather than substituting unrelated host-level telemetry.
+15. Not derive cache or buffer hit ratio unless the technology-specific hit, miss or read semantics and exact formula are verified.
+16. Keep replication data delay, time lag, replica health, and overall replication state distinct.
+17. Not aggregate latency, utilization percentages, cache-hit percentages, or replication lag across unrelated database instances or incompatible technologies.
+18. Verify safe query identifiers before generating query-level ranking panels.
+19. Not expose SQL text, parameters, literals, users, database values, or other potentially sensitive query-level data without explicit user authorization and verified telemetry support.
+20. Generate database instance, database name, database technology, host, environment, region, and cloud-provider filters only when those exact properties are verified on the selected telemetry.
+21. Not assume `db.namespace` or another database semantic attribute is automatically equivalent to the requested database-name filter.
+22. Retain unsupported requested panels in the design as `UNVERIFIED`.
+23. Omit speculative SignalFlow and deployable Terraform for every `UNVERIFIED` panel.
+24. Verify Terraform resources and attributes against a provider version compatible with the repository constraint before generating deployable Terraform.
+25. Report final status truthfully as `GENERATED`.
+26. Not run Terraform init, validate, plan, runtime SignalFlow, publish, apply, or Splunk write operations in Generate mode.
+
+### Failure conditions
+
+Fail the test if Copilot:
+
+- fabricates database metrics, dimensions, identifiers, units, metric types, or aggregation semantics
+- treats receiver documentation as proof that the telemetry is present in the target Splunk organization
+- assumes PostgreSQL, Oracle, SQL Server, MySQL, APM, infrastructure, and cloud-database telemetry are interchangeable
+- labels telemetry presence as database availability or uptime without a verified availability definition
+- presents backend or worker counts as active client connections without verified semantics
+- invents connection-utilization, storage-utilization, cache-hit, or replication-health formulas
+- generates query/s, transactions/s, IOPS, bytes/s, or another per-second value from a cumulative counter without a verified transformation
+- conflates lock counts, lock waits, wait duration, or deadlocks
+- attributes host CPU, memory, disk, or network telemetry to a database without verified attribution
+- treats replication data measured in bytes as time lag or a health score
+- aggregates latency, utilization, cache-hit percentage, or replication lag across incompatible instances or technologies
+- exposes raw SQL, SQL parameters, literals, users, or other sensitive query-level values without explicit authorization
+- invents database-name, technology, host, environment, region, or cloud-provider filter properties
+- treats `db.namespace` as a database-name property without verifying that semantic for the selected telemetry
+- generates deployable Terraform or speculative SignalFlow for unresolved telemetry
 - verifies Terraform schema against an incompatible provider version
 - runs Terraform validation tooling or runtime SignalFlow in Generate mode
 - publishes or applies anything
