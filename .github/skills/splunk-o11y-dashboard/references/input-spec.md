@@ -3,6 +3,7 @@
 ## Contents
 
 - [Core rule](#core-rule)
+- [Structured input is authoritative](#structured-input-is-authoritative)
 - [Recommended structured input](#recommended-structured-input)
 - [Supported top-level sections](#supported-top-level-sections)
 - [Dashboard fields](#dashboard-fields)
@@ -28,6 +29,58 @@ Do not require structured input when the user's natural-language request is suff
 When structured input is supplied, treat it as the primary dashboard specification for that request.
 
 Do not silently override explicit structured values with assumed defaults.
+
+## Structured input is authoritative
+
+When structured YAML or JSON is supplied, it defines the requested dashboard semantics.
+
+If the structured input does not specify a semantic choice, do not add one merely because a Splunk-maintained library, documentation example, existing dashboard, or prior generation uses it.
+
+### Implementation mechanics versus user-visible semantics
+
+Separate the two explicitly:
+
+- **Implementation mechanics** are the minimum verified constructs needed to compute the requested signal without changing what the user sees, such as calling `histogram()` for histogram telemetry, using `.publish()`, or applying an already-documented skill default such as the default-MMS `sf_dimensionalized` exclusion in `signalflow.md`.
+- **User-visible semantics** change what the chart, dashboard, or deployment means or shows.
+
+Do not silently introduce user-visible semantics, including:
+
+- fixed aggregation or rolling windows, such as `over=duration('1m')`
+- fixed data or request-count intervals, such as a pinned `resolution=` or "requests in the last 10s"
+- additional grouping dimensions, such as `by=[...]` on `sf_environment`, `sf_service`, or another dimension
+- additional filters or filter values
+- dashboard variables or fixed dashboard filters
+- dashboard group, container, or folder names
+- per-service, per-environment, or other breakdowns
+
+Introduce them only when they are:
+
+1. explicitly supplied by the structured input, or
+2. an already-documented skill default that is valid for that exact field, and the final response reports it as an applied default.
+
+A library or example pattern is evidence that a construct is syntactically and semantically valid. It is not authorization to adopt that pattern's windows, intervals, groupings, or filters for this request.
+
+If the requested signal cannot be implemented without a user-visible choice the input did not make, do not pick one silently. Ask when the choice blocks correct generation, or keep the panel in the design as `UNVERIFIED` and omit its deployable code.
+
+### Filter and variable intent is not grouping intent
+
+A requested filter or variable and chart grouping are separate decisions.
+
+An optional environment variable, environment filter, or `scope.environment` value does not authorize grouping charts `by` environment. The same applies to service, region, namespace, host, and every other scope dimension.
+
+Generate a breakdown only when a panel explicitly requests it, for example through `group_by`, `dimensions`, or a question that clearly requires one stream per dimension value.
+
+If a requested variable or filter is `UNVERIFIED` and omitted, do not compensate by adding a grouping on that dimension.
+
+### Required structural values that were not supplied
+
+When Terraform or REST requires a structural value that the structured input did not provide, such as a dashboard group or container:
+
+1. Do not invent a name, ID, or container.
+2. Use an explicitly documented safe default behavior only when this skill defines one for that exact field, and report it.
+3. Otherwise mark the deployment detail `UNVERIFIED`, omit the affected deployable resource, and state what value is required.
+
+See `terraform.md` for the dashboard-group application of this rule.
 
 ## Recommended structured input
 
@@ -166,6 +219,8 @@ For every variable or filter:
 3. Validate values where possible.
 4. Distinguish interactive variables from fixed filters.
 5. Do not silently substitute similarly named properties.
+6. Do not convert a variable or filter into chart grouping, and do not add grouping on that property unless a panel explicitly requests it.
+7. Optional variables or filters remain optional; do not turn them into a fixed filter, a value restriction, or a breakdown.
 
 ## Panel fields
 
@@ -201,6 +256,7 @@ When structured input is incomplete:
 3. Use verified inventory or documentation.
 4. Ask only for information that blocks correct generation.
 5. Leave unsupported telemetry unresolved rather than inventing it.
+6. Leave unspecified semantic choices unspecified, as described in [Structured input is authoritative](#structured-input-is-authoritative).
 
 Do not reject an otherwise usable specification merely because optional fields are missing.
 
@@ -226,6 +282,8 @@ That normalized plan should include:
 - generation mode
 - target realm and dashboard group when relevant
 - variables and fixed filters
+- explicit groupings, windows, and intervals, or none when not requested
+- documented skill defaults actually applied
 - required panels
 - verified telemetry
 - unresolved telemetry

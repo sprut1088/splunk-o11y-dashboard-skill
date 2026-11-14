@@ -13,6 +13,7 @@ Use these scenarios to test whether the skill produces correct, safe, and useful
 - [Acceptance Test 7 - Database Monitoring Dashboard](#acceptance-test-7---database-monitoring-dashboard)
 - [Acceptance Test 8 - Validate Mode APM Service Dashboard](#acceptance-test-8---validate-mode-apm-service-dashboard)
 - [Acceptance Test 9 - Publish Mode APM Service Dashboard](#acceptance-test-9---publish-mode-apm-service-dashboard)
+- [Acceptance Test 10 - Structured YAML Input APM Dashboard](#acceptance-test-10---structured-yaml-input-apm-dashboard)
 
 ## Acceptance Test 1 - APM Service Dashboard
 
@@ -814,3 +815,163 @@ Observed safe behavior included:
 - no apply, publication, Splunk write API call, or live SignalFlow execution
 - truthful final lifecycle status of `GENERATED`
 - explicit statement that a later `terraform apply` of a reviewed plan would require separate user confirmation
+
+
+## Acceptance Test 10 - Structured YAML Input APM Dashboard
+
+### User request
+
+The user supplied the following authoritative YAML:
+
+```yaml
+dashboard:
+  title: Payments APM - Structured Input Test
+  description: APM dashboard generated from structured YAML requirements
+  mode: Generate
+  output: Terraform
+  experience: new
+
+scope:
+  telemetry_domain: apm
+  service: payments
+
+panels:
+  - title: Request Count
+    metric_intent: request_count
+    visualization: single_value
+  - title: Request Rate
+    metric_intent: request_rate
+    visualization: line
+  - title: Error Rate
+    metric_intent: error_rate
+    visualization: line
+  - title: P95 Latency
+    metric_intent: latency_p95
+    visualization: line
+
+filters:
+  - intent: service
+    value: payments
+    required: true
+  - intent: environment
+    variable: true
+    required: false
+
+layout:
+  columns: 12
+```
+
+The request explicitly required:
+
+- the structured YAML to remain authoritative
+- no invented metrics, dimensions, filters, provider attributes, defaults, windows, intervals, or groupings
+- Splunk APM-native Monitoring MetricSet telemetry
+- telemetry discovery before SignalFlow generation
+- preservation of the distinction between request count and request rate
+- verified error classification
+- verified latency units
+- protection of default Monitoring MetricSets from dimensionalized/custom MetricSets
+- verification of exact filter properties
+- an unverified optional environment variable to remain in the design but be omitted from deployable Terraform
+- a repository-compatible Terraform provider version
+- Generate mode only
+- no `terraform init`, `terraform validate`, `terraform plan`, or `terraform apply`
+- no Splunk write calls
+- no live execution of generated SignalFlow
+- truthful lifecycle reporting
+
+### Expected behavior
+
+The skill should:
+
+1. Trigger automatically.
+2. Parse the YAML without silently changing its semantics.
+3. Treat missing semantic choices as unresolved rather than inventing them.
+4. Separate filter/variable intent from chart-grouping intent.
+5. Never infer environment grouping from an environment variable request.
+6. Never invent dashboard group/container names.
+7. If no dashboard group is supplied, omit the dashboard group, dashboard resource, and dashboard URL output.
+8. Permit verified standalone chart resources to remain when no dashboard can safely be created.
+9. Use Splunk APM-native telemetry where verified.
+10. Preserve the distinction between request count and request rate.
+11. Not generate Request Rate when the verified implementation requires an unrequested resolution or window.
+12. Not choose between errors-per-second and error-percentage semantics when the input only says `error_rate`.
+13. Keep unresolved Request Rate and Error Rate panels in the design as `UNVERIFIED` and omit their Terraform resources.
+14. Keep the optional environment variable `UNVERIFIED` when the exact property or mechanism is unresolved and omit it from Terraform.
+15. Not compensate for an omitted variable by grouping charts by environment.
+16. Use the supplied `payments` service value only with a verified exact service property.
+17. Protect default `service.request` Monitoring MetricSets with the documented `sf_dimensionalized` exclusion where appropriate.
+18. Verify latency units before assigning the P95 display unit.
+19. Preserve the repository provider strategy.
+20. Generate only verified provider resources and attributes.
+21. Keep the generated artifact inventory and the final report consistent.
+22. Re-read and reconcile the final artifact before reporting generated and omitted resources.
+23. Perform no Terraform validation or publication operations in Generate mode.
+24. End with exactly:
+
+    ```text
+    Final lifecycle status: GENERATED
+    ```
+
+### Failure conditions
+
+Fail the test if Copilot:
+
+- silently introduces a fixed resolution, rolling window, request-count interval, or other time semantic not present in the YAML
+- silently groups charts by service, environment, or another dimension not explicitly requested at panel level
+- treats an environment variable request as permission to group charts by environment
+- invents a dashboard group or copies the dashboard title into a group name
+- generates a dashboard requiring an unresolved group
+- invents an environment property
+- chooses between `sf_environment` and `deployment.environment` without sufficient evidence
+- turns an optional unresolved variable into a fixed filter or grouping
+- treats request count as request rate
+- generates Request Rate using an unrequested 1-second window or resolution
+- chooses an Error Rate definition not present in the input
+- leaves an `UNVERIFIED` panel or resource in deployable Terraform
+- reports a resource as omitted while leaving it in Terraform
+- reports a resource as generated when it is absent
+- introduces generic OpenTelemetry metrics in place of intended Splunk APM telemetry without explicit verification
+- omits the default-MMS `sf_dimensionalized` protection when required
+- uses unverified latency units
+- uses provider attributes incompatible with the repository provider version
+- runs `terraform init`, `terraform validate`, `terraform plan`, `terraform apply`, Splunk write operations, or generated SignalFlow in Generate mode
+- claims `STATICALLY_VALIDATED`, `PLAN_VALIDATED`, or `APPLIED` without actually reaching that state
+- appends metadata or unresolved-item text to the required final lifecycle-status line
+
+### Acceptance result
+
+The initial run failed because it:
+
+- generated Request Rate while reporting it as omitted
+- introduced a 10-second request-count interpretation
+- introduced a 1-minute Error Rate window
+- grouped charts by environment and service without the YAML requesting those breakdowns
+- invented a dashboard group
+- produced a mismatch between the report and the generated artifact
+
+After remediation to `input-spec.md`, `signalflow.md`, `terraform.md`, `output-contract.md`, and `SKILL.md`, the rerun passed.
+
+Observed final safe behavior included:
+
+- Request Count generated as a standalone chart using verified `service.request` histogram count semantics
+- P95 Latency generated as a standalone chart using verified histogram percentile semantics and the native nanosecond unit
+- Request Rate retained as `UNVERIFIED` and omitted because implementing it safely required an unrequested resolution or window
+- Error Rate retained as `UNVERIFIED` and omitted because the YAML did not define errors per second versus error percentage
+- the environment variable retained as `UNVERIFIED` and omitted
+- no environment grouping introduced
+- no dashboard group invented
+- no `signalfx_dashboard_group` resource generated
+- no `signalfx_dashboard` resource generated
+- no dashboard URL output generated
+- the supplied `payments` service scope applied only through a verified service property
+- default `service.request` custom/dimensionalized MetricSets excluded using the documented `sf_dimensionalized` protection
+- generated Terraform containing exactly two chart resources, with the report matching them
+- no `terraform init`, `terraform validate`, `terraform plan`, or `terraform apply` run
+- no Splunk write operation
+- no generated SignalFlow executed against the live organization
+- a final lifecycle line of exactly:
+
+  ```text
+  Final lifecycle status: GENERATED
+  ```

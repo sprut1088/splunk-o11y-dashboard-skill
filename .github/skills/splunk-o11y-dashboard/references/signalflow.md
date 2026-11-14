@@ -3,6 +3,7 @@
 ## Contents
 
 - [Critical pre-generation gate: histogram SignalFlow](#critical-pre-generation-gate-histogram-signalflow)
+- [Library patterns do not supply requested semantics](#library-patterns-do-not-supply-requested-semantics)
 - [Core rule](#core-rule)
 - [Basic program structure](#basic-program-structure)
 - [Stream naming and publish rules](#stream-naming-and-publish-rules)
@@ -288,6 +289,23 @@ histogram('spans').rate(by=['sf_operation'])
 ```
 
 merely to obtain endpoint grouping.
+
+### Library patterns do not supply requested semantics
+
+Splunk-maintained SignalFlow library programs, such as the APM detector `streams.flow` helpers, can verify that a construct is valid. They do not define what the user requested.
+
+Do not copy these parameters from a library or example into a dashboard chart unless the request explicitly supplies them or a documented skill default for that exact field applies:
+
+- `over=duration(...)` or another rolling window
+- `resolution=` or another fixed data interval
+- `by=[...]` or `allow_missing=[...]` grouping dimensions
+- additional `filter(...)` terms beyond the requested scope and documented skill defaults
+
+For example, from a library error-rate pattern, keep only the verified error selector and ratio arithmetic. Do not also keep its one-minute window or its environment grouping unless the request asked for them.
+
+Do not describe a chart with an interval the request did not specify, such as "requests in the most recent 10s".
+
+If the requested signal cannot be correctly computed without one of these choices, and the request did not make it, do not choose silently. Ask, or keep the panel `UNVERIFIED` and omit its deployable code. If a documented skill default is applied, report it in the final response.
 
 ### Unverified SignalFlow must not become deployable code
 

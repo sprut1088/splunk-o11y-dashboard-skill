@@ -6,6 +6,8 @@
 - [Core rule](#core-rule)
 - [Provider and resource hierarchy](#provider-and-resource-hierarchy)
 - [Dashboard resource hierarchy](#dashboard-resource-hierarchy)
+- [Dashboard group not supplied](#dashboard-group-not-supplied)
+- [Generated resources must match the report](#generated-resources-must-match-the-report)
 - [Dashboard layout rules](#dashboard-layout-rules)
 - [Layout strategy](#layout-strategy)
 - [Dashboard filters and variables](#dashboard-filters-and-variables)
@@ -357,6 +359,28 @@ Prefer Terraform resource references over hard-coded Splunk resource IDs when th
 
 Do not create a new dashboard group when the user intends to place the dashboard in an existing managed dashboard group.
 
+### Dashboard group not supplied
+
+The dashboard group is a required structural value. Do not invent it.
+
+When the request does not supply a dashboard group name, an existing group ID, or a verified existing group:
+
+1. Do not create a `signalfx_dashboard_group` with an invented name, including a name copied from the dashboard name or test title.
+2. This skill defines no default dashboard group, so mark the dashboard group `UNVERIFIED`.
+3. Omit every deployable resource that requires it: the `signalfx_dashboard_group`, the `signalfx_dashboard` that references it, and any output that references either one.
+4. Chart resources whose telemetry and SignalFlow are verified may still be generated as standalone resources, and must be reported as not yet attached to a dashboard.
+5. State exactly which value is required to complete the deployment, such as an existing dashboard group ID or an approved new group name.
+
+When the user supplies a group name for a new group, use exactly that name. When the user supplies an existing group, reference it and do not create a duplicate.
+
+### Generated resources must match the report
+
+The final Terraform is the source of truth for what was generated. Before reporting, follow the reconciliation gate in `output-contract.md`.
+
+- A panel, variable, filter, or group reported `UNVERIFIED` or omitted must not have a resource, nested `chart`, `variable`, or `filter` block, or output in the Terraform.
+- A resource present in the Terraform must be reported as generated.
+- Header comments in generated files, such as a "Not implemented" note, must match the final resources.
+
 
 ## Dashboard layout rules
 
@@ -493,6 +517,8 @@ For example:
 
 Do not generate both a fixed filter and a variable for the same property unless there is a deliberate reason.
 
+A dashboard variable or filter does not authorize SignalFlow grouping on the same property. Do not add `by=[...]` on `sf_environment`, `deployment.environment`, `sf_service`, or another dimension because a variable or filter for that dimension was requested, including when that variable is omitted as `UNVERIFIED`. Grouping requires an explicit panel-level request; see `input-spec.md`.
+
 
 ## Chart resource selection
 
@@ -585,6 +611,7 @@ In Generate mode:
 3. Use verified telemetry and SignalFlow.
 4. Do not run or imply `terraform apply`.
 5. Clearly identify any unresolved assumptions or unverified values.
+6. End the response with `Final lifecycle status: GENERATED` unless a later lifecycle state was actually reached as defined in [Validation status](#validation-status).
 
 Generated Terraform is not automatically considered deployment-ready.
 

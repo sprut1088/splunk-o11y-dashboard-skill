@@ -9,6 +9,7 @@ Follow this workflow in order.
 
 1. Understand the dashboard request.
    - Accept either natural-language requirements or structured YAML/JSON.
+   - Treat structured input as authoritative: never add unrequested windows, intervals, groupings, filters, variables, or dashboard groups (see `references/input-spec.md`).
    - Identify the dashboard purpose, intended audience, telemetry domain, desired output format, target Splunk realm if relevant, requested filters, and required services or resources.
    - Ask only for information that is genuinely required to produce a correct dashboard.
    - Preserve requested panels even when their implementation cannot yet be verified.
@@ -472,6 +473,7 @@ Correct partial Terraform is preferable to complete but speculative Terraform.
    - Check every Terraform resource attribute against the selected provider schema.
    - Report assumptions and unresolved gaps.
    - Assign only the validation status actually achieved.
+   - Reconcile the final artifact with the report, then end with `Final lifecycle status: <STATUS>` (see `references/output-contract.md`).
 
 8. Publish only when explicitly requested.
    - Never publish or apply merely because credentials or connectivity are available.
