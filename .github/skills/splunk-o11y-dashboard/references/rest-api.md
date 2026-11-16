@@ -3,6 +3,7 @@
 ## Contents
 
 - [Core rule](#core-rule)
+- [Endpoint verification gate](#endpoint-verification-gate)
 - [Realm and API endpoint](#realm-and-api-endpoint)
 - [Authentication and secret handling](#authentication-and-secret-handling)
 - [Token rules](#token-rules)
@@ -43,6 +44,46 @@ Do not invent:
 - unsupported payload properties
 
 Verify the current Splunk Observability Cloud API documentation before generating an unfamiliar API operation.
+
+## Endpoint verification gate
+
+Every REST endpoint the skill mentions must be independently verified from authoritative Splunk documentation before it is presented as an actionable API call. Verification must cover the exact HTTP method and the exact path.
+
+This gate applies equally to:
+
+- write endpoints
+- read-only endpoints
+- existence checks
+- duplicate checks
+- lookup or search endpoints
+- validation or preflight endpoints
+- helper or auxiliary API calls
+
+Never infer an endpoint from:
+
+- resource naming conventions
+- another resource's API shape
+- common REST patterns
+- guessed singular or plural resource names
+- previously seen but unverified API behavior
+
+User assertions do not validate an endpoint.
+
+Assign `VERIFIED_DOCS` to an endpoint only when authoritative Splunk documentation supports that exact method and path. Verifying an endpoint for one resource does not verify the equivalent endpoint for another resource.
+
+If a read-only check is desirable but its exact endpoint cannot be verified, state it without naming a path, for example:
+
+```text
+A read-only existence check is recommended, but the exact API endpoint remains UNVERIFIED.
+```
+
+An unverified endpoint, including an auxiliary one, must not appear in:
+
+- generated commands
+- proposed publication sequences
+- troubleshooting instructions
+- preflight steps
+- future-action recommendations
 
 ## Realm and API endpoint
 
@@ -207,6 +248,8 @@ For a specific existing object, the API commonly uses the object's ID:
 Verify the supported HTTP method and current request schema before generating or executing the operation.
 
 Do not infer that every resource supports every HTTP method merely because another resource does.
+
+These paths are structural candidates, not verified endpoints. Apply the [Endpoint verification gate](#endpoint-verification-gate) to each exact method and path before presenting it.
 
 ### Creation order
 
