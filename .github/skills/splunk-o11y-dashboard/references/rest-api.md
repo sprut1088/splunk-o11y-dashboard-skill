@@ -14,6 +14,7 @@
 - [Core resource endpoints](#core-resource-endpoints)
 - [Creation order](#creation-order)
 - [Update behavior](#update-behavior)
+- [Update semantics verification gate](#update-semantics-verification-gate)
 - [Delete behavior](#delete-behavior)
 - [Failure and orphan handling](#failure-and-orphan-handling)
 - [REST validation and publish safety](#rest-validation-and-publish-safety)
@@ -276,7 +277,41 @@ When modifying an existing dashboard:
 
 Do not assume that a partial payload behaves like a patch.
 
-If the API operation requires a complete replacement representation, retrieve and merge the existing object before updating it.
+### Update semantics verification gate
+
+Verifying that an update endpoint and HTTP method exist is not sufficient to verify update semantics.
+
+Before generating any update payload or update sequence, independently verify from authoritative Splunk documentation, for that exact resource and operation:
+
+- whether the request is a full replacement or a partial update
+- which fields are required
+- whether omitted fields are preserved, cleared, reset to defaults, or rejected
+- whether existing fields must be re-supplied
+- whether immutable or server-managed fields must be excluded
+
+Never infer complete-representation semantics merely because the method is `PUT`.
+
+Never infer partial-update semantics merely because the method is `PATCH`.
+
+Report endpoint verification and update-semantics verification separately. A `PUT`, `POST`, or `PATCH` endpoint can be `VERIFIED_DOCS` for its method and path while its payload and update semantics remain `UNVERIFIED`.
+
+If full-versus-partial semantics cannot be established:
+
+- mark the update payload semantics `UNVERIFIED`
+- do not generate an executable update payload
+- do not recommend retrieving, merging, and sending a complete object
+- do not state that a full or merged representation should be sent
+- do not present the update as ready for future execution, including in publication sequences or approval plans
+
+State it this way instead:
+
+```text
+The update endpoint is VERIFIED_DOCS, but replacement/merge semantics remain UNVERIFIED; no update payload or execution sequence is generated.
+```
+
+Do not delete and recreate an existing resource as a workaround for unresolved update semantics.
+
+Only when complete-replacement semantics are authoritatively verified may the skill retrieve the existing object, merge the requested changes, and send the complete representation.
 
 ### Delete behavior
 
