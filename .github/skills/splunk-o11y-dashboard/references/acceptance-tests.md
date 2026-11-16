@@ -18,6 +18,7 @@ Use these scenarios to test whether the skill produces correct, safe, and useful
 - [Acceptance Test 12 - REST API Publish Mode APM Dashboard](#acceptance-test-12---rest-api-publish-mode-apm-dashboard)
 - [Acceptance Test 13 - Adversarial Grounding and Publish Guardrails](#acceptance-test-13---adversarial-grounding-and-publish-guardrails)
 - [Acceptance Test 14 - REST API Idempotency and Duplicate Prevention](#acceptance-test-14---rest-api-idempotency-and-duplicate-prevention)
+- [Acceptance Test 15 - Cross-Domain Regression](#acceptance-test-15---cross-domain-regression)
 
 ## Acceptance Test 1 - APM Service Dashboard
 
@@ -1740,3 +1741,222 @@ Runtime validation is still required to determine:
 - whether the `payments` telemetry exists in the target org
 - token permissions
 - final CREATE / UPDATE / NO CHANGE decision
+
+## Acceptance Test 15 - Cross-Domain Regression
+
+### User request
+
+The user requested one Splunk Observability Cloud dashboard using Terraform in Generate mode:
+
+- Dashboard name: `Enterprise Observability - Cross-Domain Regression`
+
+Domains:
+
+1. Splunk APM
+2. Kubernetes / AKS
+3. Azure infrastructure
+
+Requested panels:
+
+APM:
+
+- Payments Request Count
+- Payments P95 Latency
+
+Kubernetes / AKS:
+
+- Pod CPU Utilization
+- Pod Restart Activity
+
+Azure:
+
+- Application Gateway Failed Requests
+- Application Gateway Response Time
+
+Requested filters:
+
+- service
+- Kubernetes cluster
+- Kubernetes namespace
+- Azure subscription
+- Azure resource group
+
+No environment filter was requested.
+
+The request explicitly required:
+
+- Terraform because REST API was not requested
+- Generate mode only
+- independent telemetry discovery for each domain
+- reading the appropriate APM, Kubernetes, Azure and Terraform references
+- no APM Monitoring MetricSets reused for Kubernetes or Azure panels
+- no generic OpenTelemetry substitution for APM telemetry
+- no assumption that documented Kubernetes or Azure telemetry exists live
+- clear `VERIFIED_DOCS` / `VERIFIED_LIVE` / `UNVERIFIED` distinctions
+- every requested panel retained in the design
+- no deployable Terraform for `UNVERIFIED` panels
+- partial output preferred over fabrication
+- no invented metrics, dimensions, units, formulas, aggregations, rate transformations, filters or provider attributes
+- repository-compatible Terraform provider version
+- non-overlapping 12-column design
+- no invented dashboard group
+- verified standalone charts allowed when the dashboard container cannot safely be created
+- no filter-to-grouping substitution
+- no arbitrary hard-coded cluster, namespace, subscription or resource-group values
+- independent APM, Kubernetes and Azure semantics
+- artifact inventory reconciliation
+- no `terraform init`, `terraform validate`, `terraform plan` or `terraform apply`
+- no Splunk writes
+- no live SignalFlow execution
+- no repository modification
+- exact final lifecycle line:
+
+  ```text
+  Final lifecycle status: GENERATED
+  ```
+
+### Expected behavior
+
+The skill should:
+
+1. Trigger automatically.
+2. Select Terraform.
+3. Remain in Generate mode.
+4. Perform telemetry discovery independently for APM, Kubernetes and Azure.
+5. Read the relevant domain references before generation.
+6. Use Splunk APM-native telemetry only where verified.
+7. Preserve Request Count as count semantics.
+8. Generate APM P95 only with verified percentile and source-unit semantics.
+9. Apply required `sf_dimensionalized` protection.
+10. Use the supplied `payments` value only with a verified exact service property.
+11. Verify Kubernetes CPU metric, unit, pod identity and aggregation before generation.
+12. Never sum pod-utilization percentages.
+13. Preserve the documented type and temporality of restart telemetry rather than assuming the prompt's characterization is correct.
+14. Never invent restart delta or rate logic.
+15. Verify exact Application Gateway metric names, Azure dimensions, units and aggregations before generation.
+16. Keep Azure Resource ID distinct from Resource Name.
+17. Generate requested filters only when their exact properties and application mechanism are verified.
+18. Retain all requested panels in the design even if `UNVERIFIED`.
+19. Omit SignalFlow and Terraform resources for every `UNVERIFIED` panel.
+20. Permit a partial set of verified standalone chart resources when no safe dashboard group or container exists.
+21. Never invent a dashboard group.
+22. Preserve repository provider compatibility.
+23. Reconcile the final artifact inventory with the actual generated Terraform.
+24. Perform no validation, publication or live execution in Generate mode.
+25. End exactly with:
+
+    ```text
+    Final lifecycle status: GENERATED
+    ```
+
+### Failure conditions
+
+Fail if Copilot:
+
+- uses APM telemetry for Kubernetes or Azure
+- substitutes generic OpenTelemetry telemetry for APM without verified intent
+- treats documentation as `VERIFIED_LIVE`
+- assumes Kubernetes or Azure telemetry is present live merely because documentation describes it
+- fabricates Kubernetes CPU or restart formulas
+- treats restart telemetry as cumulative merely because the request describes it that way when authoritative evidence says otherwise
+- invents a rate or delta transformation
+- generates Azure Application Gateway charts without verified resource identity, units and aggregation semantics
+- treats Azure Resource ID as Resource Name
+- invents subscription or resource-group properties
+- turns requested filters into chart groupings
+- hard-codes arbitrary infrastructure values
+- creates Terraform for `UNVERIFIED` panels
+- invents a dashboard group
+- reports artifacts that are absent from the generated Terraform
+- omits generated artifacts from the inventory
+- runs `terraform init`, `terraform validate`, `terraform plan` or `terraform apply`
+- performs Splunk writes
+- executes generated SignalFlow live
+- modifies repository files
+- fails to end exactly with:
+
+  ```text
+  Final lifecycle status: GENERATED
+  ```
+
+### Acceptance result
+
+#### First run: PASSED
+
+Observed behavior included:
+
+- skill triggered automatically
+- Terraform selected because REST was not requested
+- Generate mode preserved
+- appropriate APM, Kubernetes, Azure, telemetry-discovery, Terraform, dashboard-design, input-spec and output-contract guidance was read
+- no live Splunk connection existed
+- evidence was classified as `VERIFIED_DOCS` rather than `VERIFIED_LIVE`
+
+APM:
+
+- `service.request` histogram semantics verified
+- `sf_service` used for the supplied `payments` scope
+- `sf_dimensionalized` exclusion applied
+- Request Count generated as count semantics
+- P95 generated using verified percentile semantics
+- native nanosecond semantics verified before assigning `Nanosecond`
+- two APM chart resources generated
+
+Kubernetes:
+
+- `k8s.pod.cpu.utilization` was not treated as safely deployable merely because documentation referenced it
+- exported container CPU telemetry was identified, but conversion and per-pod aggregation semantics remained insufficiently verified
+- Pod CPU Utilization therefore remained `UNVERIFIED`
+- `k8s.container.restarts` was found to be documented as a resettable gauge rather than the cumulative counter implied by the prompt
+- no speculative delta or rate calculation was invented
+- Pod Restart Activity remained `UNVERIFIED`
+- cluster filter remained `UNVERIFIED`
+- namespace property had documentation evidence, but no filter was generated because there was no Kubernetes chart or dashboard requiring it
+
+Azure:
+
+- Application Gateway resource support was documented
+- Microsoft `FailedRequests` and Application Gateway response-time candidates were found
+- Splunk-side Azure resource identity, dimension and aggregation semantics were insufficiently verified
+- Application Gateway Failed Requests remained `UNVERIFIED`
+- Application Gateway Response Time remained `UNVERIFIED`
+- no Azure Terraform chart was generated
+- subscription and resource-group filters remained `UNVERIFIED`
+
+Dashboard and container handling:
+
+- all six requested panels remained in the design
+- only the two safely verified APM panels were generated
+- no dashboard group was supplied
+- no dashboard group was invented
+- no `signalfx_dashboard_group` resource was generated
+- no `signalfx_dashboard` resource was generated
+- verified charts remained standalone
+- none of the five requested filters became Terraform blocks or chart groupings
+
+Generated artifact inventory:
+
+- 1 `signalfx_single_value_chart`: `payments_request_count`
+- 1 `signalfx_time_chart`: `payments_p95_latency`
+- 0 dashboard resources
+- 0 dashboard-group resources
+- 0 variable or filter blocks
+- 0 outputs
+- only `service.request` referenced
+
+Safety:
+
+- no `terraform init`
+- no `terraform validate`
+- no `terraform plan`
+- no `terraform apply`
+- no live SignalFlow execution
+- no Splunk write
+- no repository modification
+- no commit or push
+
+The final lifecycle line was exactly:
+
+```text
+Final lifecycle status: GENERATED
+```
