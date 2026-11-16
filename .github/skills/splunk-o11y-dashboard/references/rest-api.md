@@ -8,6 +8,7 @@
 - [Authentication and secret handling](#authentication-and-secret-handling)
 - [Token rules](#token-rules)
 - [Secret handling](#secret-handling)
+- [Credential environment runtime-evidence gate](#credential-environment-runtime-evidence-gate)
 - [Read versus write access](#read-versus-write-access)
 - [Dashboard resource hierarchy and operation order](#dashboard-resource-hierarchy-and-operation-order)
 - [Read before write](#read-before-write)
@@ -85,6 +86,34 @@ An unverified endpoint, including an auxiliary one, must not appear in:
 - troubleshooting instructions
 - preflight steps
 - future-action recommendations
+
+### Endpoint evidence in final recommendations
+
+Every exact endpoint that appears anywhere in the final answer must have explicit authoritative support for that exact method, path, and query behavior before it is presented as actionable. This includes endpoints in:
+
+- recommended next operations
+- duplicate checks
+- existence checks
+- read-only preflight steps
+- future approval sequences
+- troubleshooting instructions
+- example commands
+
+The verification must be established in the same response: state the exact method and path as `VERIFIED_DOCS` together with its authoritative source before naming it in any recommendation. An endpoint that was not explicitly verified in the response must not be named, even if it seems obvious.
+
+Do not treat an endpoint as verified because another operation on the same resource, or a related resource, was verified. For example:
+
+- verifying `POST /dashboard` does not verify `GET /dashboard`
+- verifying `GET /dashboardgroup/{id}` does not verify `GET /dashboard`
+- verifying a collection path does not verify its query parameters, filtering, or search behavior
+
+Do not infer query behavior, such as searching by name, from resource naming conventions.
+
+If an exact endpoint was not independently verified, do not name it. Say instead:
+
+```text
+A read-only duplicate/existence check is recommended, but the exact API operation remains UNVERIFIED.
+```
 
 ## Realm and API endpoint
 
@@ -172,6 +201,71 @@ $env:SPLUNK_ACCESS_TOKEN = "<set securely outside source control>"
 The placeholder is instructional only.
 
 Do not ask the user to paste a production access token into source-controlled files.
+
+When a user supplies a credential literal in the conversation:
+
+- never reproduce it in commands, payloads, files, diagnostics, summaries, or examples
+- never encode, escape, split, or otherwise transform it to bypass these rules
+- never create `.env` or any other file containing it
+- never stage, commit, or recommend committing it
+- use symbolic environment references only, such as `${SPLUNK_ACCESS_TOKEN}` or `$env:SPLUNK_ACCESS_TOKEN`
+- a private repository does not make secret storage safe
+
+### Credential environment runtime-evidence gate
+
+Environment inspection must be boolean/existence-only. Never print, echo, dump, or compare credential values, and never enumerate all environment variables to find credentials.
+
+Report the credential environment state only from the observed outcome of a non-revealing existence check. Distinguish three outcomes:
+
+1. The check completed successfully and the variable exists: report `<VARIABLE> is configured`.
+2. The check completed successfully and the variable does not exist: report `<VARIABLE> is not configured`.
+3. The check failed, could not run, or its result could not be observed: report `Credential environment state: UNVERIFIED`.
+
+A check has completed successfully only when the command ran without error and its existence result was observed. Never convert any of the following into "not configured":
+
+- a tool or command failure
+- a non-zero or abnormal exit status
+- missing or truncated stdout
+- a shell or parser error
+- a timeout
+- a permission error
+- an unavailable execution environment
+
+Do not claim that no credential exists, that no authenticated session exists, that the token is absent, or that runtime access is unavailable because no token is configured, unless successful evidence establishes that statement. If the state is `UNVERIFIED`, say that runtime access was not attempted rather than that it is unavailable.
+
+The existence of a credential environment variable is not authentication validation. It must never be reported as `VERIFIED_LIVE` or `RUNTIME_VALIDATED`, and it must never be treated as authorization to read or write Splunk resources.
+
+#### Credential-evidence scope
+
+An environment-variable existence check proves only the state of the exact variable checked. Do not extend its result beyond that variable.
+
+Treat these as separate facts. Each needs its own evidence:
+
+1. Specific credential-variable state, such as whether `SPLUNK_ACCESS_TOKEN` is set.
+2. Authenticated-session state, such as whether an authenticated connector, session, CLI profile, credential store, or runtime integration is available.
+3. Live API validation state, such as whether an authenticated read-only Splunk API call actually succeeded in this run.
+
+A successful `<VARIABLE> is not configured` result must never be turned into a broader conclusion such as:
+
+- no authenticated connection exists
+- no authenticated session exists
+- no Splunk authentication exists
+- live access is unavailable
+- runtime authentication is impossible
+
+Do not infer the absence of other authentication mechanisms, connectors, sessions, credential stores, CLI profiles, or runtime integrations unless each was independently checked. If a mechanism was not inspected, its state remains `UNVERIFIED`.
+
+When no authenticated live operation was established during the run, use wording such as:
+
+```text
+No authenticated Splunk runtime connection was established in this run.
+```
+
+or:
+
+```text
+Live telemetry discovery was not attempted because no verified runtime authentication path was established for this run.
+```
 
 ### Read versus write access
 
