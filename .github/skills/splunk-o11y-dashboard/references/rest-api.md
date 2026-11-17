@@ -20,6 +20,7 @@
 - [Failure and orphan handling](#failure-and-orphan-handling)
 - [REST validation and publish safety](#rest-validation-and-publish-safety)
 - [Uncertain write outcome gate](#uncertain-write-outcome-gate)
+- [Concurrency and lost-update evidence gate](#concurrency-and-lost-update-evidence-gate)
 
 Use this reference whenever generating, reviewing, validating, or executing Splunk Observability Cloud REST API operations for dashboards.
 
@@ -609,3 +610,94 @@ A name search returning no candidates must not automatically authorize CREATE wh
 Keep CREATE / UPDATE / NO CHANGE unresolved until the evidence supports exactly one of those states.
 
 This gate does not relax any other rule in this reference. The endpoint verification gate, update semantics verification gate, delete safeguards, credential safeguards, approval gates, and partial-failure resource preservation all continue to apply.
+
+## Concurrency and lost-update evidence gate
+
+Apply this gate whenever an update to an existing resource is considered, and whenever documentation is reviewed for ETag, If-Match, If-Unmodified-Since, version, revision, generation, conditional update, optimistic concurrency, compare-and-swap, conflict status, or another write-precondition mechanism.
+
+### Mechanism evidence states
+
+Distinguish these three states. They are not equivalent:
+
+1. Mechanism `VERIFIED_DOCS`: authoritative Splunk documentation explicitly establishes the exact mechanism, header or field, request behavior, response behavior, and conflict outcome for that exact resource and operation.
+2. Mechanism not found: the documentation reviewed in this run did not describe such a mechanism.
+3. Mechanism proven absent: authoritative evidence explicitly establishes that no such mechanism exists for that resource and operation.
+
+Failure to find a concurrency mechanism in the reviewed documentation does not prove that no such mechanism exists.
+
+If no mechanism is authoritatively verified, classify it as:
+
+```text
+Concurrency protection: UNVERIFIED
+```
+
+Never convert `UNVERIFIED` into `absent`. Never say:
+
+```text
+UNVERIFIED, so treat it as absent.
+```
+
+Use wording such as:
+
+```text
+No concurrency-protection mechanism was verified from the authoritative documentation reviewed in this run.
+```
+
+While concurrency protection is `UNVERIFIED`:
+
+- do not rely on ETag, If-Match, version, revision, conflict status, or any other conditional-write behavior
+- do not invent or guess such headers, fields, or status codes, and do not infer them from generic HTTP or REST conventions
+- do not claim such mechanisms do not exist unless authoritative evidence explicitly establishes their absence
+
+A documented read-only field such as a last-updated timestamp can help detect a change between two reads. It is not a write precondition unless documentation explicitly establishes that it can be used as one.
+
+### Read-to-write race wording
+
+When a fresh read and a later update are not protected by a `VERIFIED_DOCS` conditional-write mechanism:
+
+- state that a read-to-write race remains
+- do not claim categorically that the race "cannot be closed" unless that impossibility is itself established by authoritative evidence
+
+Use wording such as:
+
+```text
+No VERIFIED_DOCS mechanism available in this run closes the read-to-write race.
+```
+
+or:
+
+```text
+Write-time conflict protection remains UNVERIFIED, so the generated workflow cannot claim lost-update prevention.
+```
+
+### Historical reads
+
+- Prior resource identity or configuration may be recorded as user-supplied runtime facts or as historical `VERIFIED_LIVE` evidence for the time of that read.
+- Current state remains `UNVERIFIED` until it is freshly read.
+- Historical `VERIFIED_LIVE` state never automatically becomes current write-time `VERIFIED_LIVE` state.
+- A known resource ID or matching name does not prove unchanged identity or configuration.
+
+### Safe future-write behavior
+
+If concurrency protection remains `UNVERIFIED`:
+
+1. Require a fresh read of the exact target resource, using a `VERIFIED_DOCS` read operation, before preparing any update.
+2. Compare current state with both the prior state and the intended state.
+3. Surface intervening changes. If current state differs from the prior state outside the requested change, report a concurrent modification and keep the write blocked until it is resolved.
+4. Preserve unrelated current changes. Do not automatically restore the prior state.
+5. Verify the update endpoint and payload semantics under the [Update semantics verification gate](#update-semantics-verification-gate).
+6. Do not present stale snapshots as update payloads, and do not recommend a blind read-merge-write from a prior read.
+7. Do not claim lost-update safety.
+8. Clearly expose the residual race before any future write.
+9. Require separate explicit approval before any future write.
+
+If the workflow allows proceeding despite residual concurrency risk, it must explicitly state that:
+
+- lost-update prevention is NOT verified
+- the residual read-to-write race remains
+- proceeding does not make the operation concurrency-safe
+- post-write verification can detect some conflicts but does not prevent them
+
+Explicit user acceptance of risk is not evidence that concurrency protection exists, and it does not change `Concurrency protection: UNVERIFIED`.
+
+This gate does not relax any other rule in this reference. The endpoint verification gate, update semantics verification gate, uncertain write outcome gate, read and credential safeguards, approval gates, and destructive-operation safeguards all continue to apply.
