@@ -19,6 +19,7 @@
 - [Delete behavior](#delete-behavior)
 - [Failure and orphan handling](#failure-and-orphan-handling)
 - [REST validation and publish safety](#rest-validation-and-publish-safety)
+- [Uncertain write outcome gate](#uncertain-write-outcome-gate)
 
 Use this reference whenever generating, reviewing, validating, or executing Splunk Observability Cloud REST API operations for dashboards.
 
@@ -432,6 +433,8 @@ If charts are created successfully but dashboard creation fails:
 
 Prefer recoverable and idempotent behavior over blindly recreating resources.
 
+When any create, update, or delete outcome is uncertain, apply the [Uncertain write outcome gate](#uncertain-write-outcome-gate).
+
 ## REST validation and publish safety
 
 Treat REST payload generation, validation, and execution as separate stages.
@@ -519,3 +522,90 @@ Before retrying a create operation after an uncertain failure:
 3. Avoid creating another resource with the same operational purpose.
 
 Do not repeatedly POST the same dashboard or chart without checking the prior result.
+
+Checking the prior result is necessary but not sufficient. A retry is allowed only when the [Uncertain write outcome gate](#uncertain-write-outcome-gate) is satisfied.
+
+## Uncertain write outcome gate
+
+Apply this gate when a create, update, or delete request was sent previously but its final server-side result is uncertain.
+
+### Uncertain outcome state
+
+1. Preserve the operation result as `UNVERIFIED`.
+2. Distinguish these states, which are not equivalent:
+   - no response ID was received
+   - no resource ID is known to the client
+   - no resource exists server-side
+3. If no ID was returned, say:
+
+   ```text
+   No confirmed resource ID is available from the prior attempt.
+   ```
+
+   Do not say:
+
+   ```text
+   No ID exists.
+   ```
+
+4. A timeout, connection failure, client-side exception, interrupted response, missing response body, or other ambiguous failure does not prove that the server rejected the write.
+5. Never assume an uncertain POST definitely failed server-side.
+6. Never assume an uncertain POST definitely succeeded server-side.
+7. Never retry an uncertain create merely because retrying would be operationally convenient.
+
+### Negative lookup evidence
+
+A read, search, or list result that returns zero candidates may resolve an uncertain write only when authoritative evidence establishes that the lookup is sufficient to prove absence for the relevant scenario.
+
+Before treating zero results as proof that the resource does not exist, verify that:
+
+- the lookup covers the correct resource population
+- required pagination was fully exhausted
+- the caller has sufficient visibility and permissions
+- the API's consistency and visibility semantics are sufficient for a recent prior write
+- the search key can identify the target resource reliably enough for the decision
+
+If any of these remain unresolved:
+
+- keep resource existence `UNVERIFIED`
+- do not classify the resource as absent
+- do not propose a new POST as ready for approval
+- do not say the resource was "very likely not created" as justification for retry
+- do not convert the result into CREATE
+
+A zero-result name search can be useful evidence, but it is not automatically proof of absence.
+
+### Retry rule
+
+A new create request after an uncertain prior create may be proposed only after the prior resource-existence state has been safely resolved to absent with sufficient evidence.
+
+If absence cannot be established, state:
+
+```text
+Prior create outcome remains UNVERIFIED; retry is blocked to avoid duplicate creation.
+```
+
+A proposed retry, when allowed, still requires separate explicit user approval under the existing publish gates.
+
+### User-supplied resource IDs
+
+For a user-supplied resource ID reported as successfully created:
+
+- preserve the ID
+- do not delete it merely to restart
+- do not claim its current configuration matches the intended configuration until verified
+- reuse it for publication only after its identity and configuration are sufficiently established when that matters to the operation
+
+Do not turn "preserve this known ID" into "reuse without verification" while configuration match remains `UNVERIFIED`.
+
+A user-supplied ID is a user-supplied runtime fact, not `VERIFIED_DOCS` or `VERIFIED_LIVE`.
+
+### Dashboard and other resource recovery
+
+Apply the same uncertain-result principle to dashboards, dashboard groups, charts, and other resources.
+
+A name search returning no candidates must not automatically authorize CREATE when the search cannot establish absence sufficiently.
+
+Keep CREATE / UPDATE / NO CHANGE unresolved until the evidence supports exactly one of those states.
+
+This gate does not relax any other rule in this reference. The endpoint verification gate, update semantics verification gate, delete safeguards, credential safeguards, approval gates, and partial-failure resource preservation all continue to apply.
