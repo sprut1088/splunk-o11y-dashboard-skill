@@ -6,11 +6,13 @@
 - [Core rule](#core-rule)
 - [Provider and resource hierarchy](#provider-and-resource-hierarchy)
 - [Dashboard resource hierarchy](#dashboard-resource-hierarchy)
+- [Dashboard-container prerequisite gate](#dashboard-container-prerequisite-gate)
 - [Dashboard group not supplied](#dashboard-group-not-supplied)
 - [Generated resources must match the report](#generated-resources-must-match-the-report)
 - [Dashboard layout rules](#dashboard-layout-rules)
 - [Layout strategy](#layout-strategy)
 - [Dashboard filters and variables](#dashboard-filters-and-variables)
+- [Dashboard filter/variable application gate](#dashboard-filtervariable-application-gate)
 - [Fixed dashboard filters](#fixed-dashboard-filters)
 - [Dashboard variables](#dashboard-variables)
 - [Filters versus variables](#filters-versus-variables)
@@ -159,7 +161,7 @@ A requested service such as:
 payments
 ```
 
-may be used as a fixed `service.name` filter because it was supplied by the user.
+may be used as the value of a fixed `service.name` filter because it was supplied by the user. That grounds the value only. It does not establish the property name or how the constraint reaches each chart; apply the [Dashboard filter/variable application gate](#dashboard-filtervariable-application-gate) before generating a dashboard `filter` or `variable`.
 
 Do not invent environment values.
 
@@ -196,25 +198,25 @@ because the chart remains permanently scoped to `payments`.
 Choose one of these patterns deliberately:
 
 1. **Dedicated service dashboard**
-   - use the verified service property with value `payments` as the fixed dashboard scope
+   - use the verified service property with value `payments` as the fixed dashboard scope, applied as a fixed SignalFlow constraint or, once the [Dashboard filter/variable application gate](#dashboard-filtervariable-application-gate) is satisfied, as a dashboard `filter`
    - do not expose that same verified service property as a service-switching variable
 
 2. **Reusable service dashboard**
    - expose the verified service property as a dashboard variable
-   - ensure chart filtering is compatible with that variable mechanism
+   - ensure chart filtering is compatible with that variable mechanism, as required by the [Dashboard filter/variable application gate](#dashboard-filtervariable-application-gate)
    - do not hard-code `payments` inside each chart
 
-If the user's request contains both a named service and a requested service filter, prefer the reusable variable interpretation only after the exact service property for the selected telemetry has been verified, unless the user explicitly states that the dashboard must be permanently locked to that service.
+If the user's request contains both a named service and a requested service filter, prefer the reusable variable interpretation only after the exact service property for the selected telemetry has been verified and the [Dashboard filter/variable application gate](#dashboard-filtervariable-application-gate) is satisfied, unless the user explicitly states that the dashboard must be permanently locked to that service.
 
 The supplied service name may be documented as the intended initial context, but do not invent an unsupported default-value attribute merely to preselect it.
 
-Before finalizing Terraform, verify that every dashboard variable can actually affect the charts it is intended to control.
+Before generating Terraform, verify that every dashboard filter and variable actually constrains the charts it is intended to control, as required by the [Dashboard filter/variable application gate](#dashboard-filtervariable-application-gate). This verification is a pre-generation requirement; it cannot be deferred to a later preview of the generated dashboard.
 
 Verifying the telemetry property name is necessary but not sufficient. Also verify that the selected Splunk dashboard/provider variable or filter mechanism is documented to constrain the generated chart type and SignalFlow program as intended.
 
 For example, do not generate a `service.name`, `sf_service`, `deployment.environment`, `sf_environment`, or other dashboard variable merely because that property exists on the selected Monitoring MetricSet. Verify that the dashboard variable/filter mechanism actually applies that property constraint to the generated `histogram()`, `data()`, or other SignalFlow chart.
 
-If that variable-to-chart behavior cannot be verified from the compatible provider schema, authoritative Splunk dashboard documentation, supplied repository evidence, or a safe read-only inspection of an existing working dashboard, keep the requested dashboard filter in the design as `UNVERIFIED` and omit the corresponding variable or filter block from deployable Terraform.
+If that variable-to-chart behavior cannot be verified from authoritative Splunk dashboard or provider documentation that explicitly addresses the generated chart type and SignalFlow construct, supplied repository evidence, or a safe read-only inspection, performed before generation, of an existing working dashboard, keep the requested dashboard filter in the design as `UNVERIFIED` and omit the corresponding variable or filter block from deployable Terraform. Provider schema evidence that a `filter` or `variable` block exists does not establish this.
 
 For Splunk APM dashboards, semantic intent such as service or environment is not sufficient evidence for a property name. Do not choose `service.name`, `deployment.environment`, `sf_service`, `sf_environment`, or another candidate until the exact property is verified for the selected Monitoring MetricSet.
 
@@ -328,6 +330,8 @@ Model dashboard resources in this dependency order:
 
 A Splunk Observability Cloud dashboard must belong to a dashboard group.
 
+That requirement does not authorize inventing or parameterizing the association. Before generating `signalfx_dashboard`, apply the [Dashboard-container prerequisite gate](#dashboard-container-prerequisite-gate).
+
 Typical structure:
 
 ```hcl
@@ -359,9 +363,35 @@ Prefer Terraform resource references over hard-coded Splunk resource IDs when th
 
 Do not create a new dashboard group when the user intends to place the dashboard in an existing managed dashboard group.
 
+### Dashboard-container prerequisite gate
+
+This gate is a generation constraint, not a recommendation. It applies before any `signalfx_dashboard` or `signalfx_dashboard_group` is written.
+
+1. A requested dashboard does not by itself authorize inventing or parameterizing missing container prerequisites.
+2. Before generating `signalfx_dashboard`, the required dashboard-group association must be sufficiently grounded from the user's input and compatible provider semantics.
+   - Grounded means the user supplied an existing dashboard-group identifier or reference, or explicitly requested a new group and supplied the exact group name and any other input the verified provider schema requires to create it.
+   - A name copied from the dashboard name, the request text, a test title, or a structural example is not grounded.
+   - A bare name for which it is unclear whether the group already exists or should be created is not sufficiently grounded.
+3. If the user does not supply an existing dashboard-group identifier/reference and does not explicitly request creation of a new group with sufficient grounded inputs:
+   - the dashboard container status remains `UNVERIFIED`
+   - do not generate `signalfx_dashboard`
+   - do not generate `signalfx_dashboard_group`
+   - do not invent a group name
+   - do not invent a group ID
+   - do not invent a Terraform resource address
+   - do not introduce a new required Terraform variable such as `dashboard_group_id` merely to work around the missing prerequisite
+   - verified charts may be emitted as standalone resources when otherwise safe
+4. Introducing a required input variable for a missing prerequisite is allowed only when the user explicitly requested that parameterization or supplied an authoritative structured input requiring it.
+   - A required Splunk realm input is specific to the realm. It is not precedent for parameterizing a dashboard group or any other missing structural prerequisite.
+5. The desire to produce a complete dashboard must never override this gate.
+6. Never knowingly generate an artifact that violates a skill rule and then describe it as a "deviation from the skill". An artifact that would violate a rule is not generated.
+7. When a hard gate blocks a dashboard container, withhold the container and explain the unresolved prerequisite instead. Dashboard `filter` and `variable` blocks are nested inside `signalfx_dashboard`, so they are withheld with it; handle them as described in [Dashboard filter/variable application gate](#dashboard-filtervariable-application-gate).
+
 ### Dashboard group not supplied
 
 The dashboard group is a required structural value. Do not invent it.
+
+This section applies the Dashboard-container prerequisite gate above. A group counts as supplied only when that gate treats it as grounded.
 
 When the request does not supply a dashboard group name, an existing group ID, or a verified existing group:
 
@@ -369,7 +399,7 @@ When the request does not supply a dashboard group name, an existing group ID, o
 2. This skill defines no default dashboard group, so mark the dashboard group `UNVERIFIED`.
 3. Omit every deployable resource that requires it: the `signalfx_dashboard_group`, the `signalfx_dashboard` that references it, and any output that references either one.
 4. Chart resources whose telemetry and SignalFlow are verified may still be generated as standalone resources, and must be reported as not yet attached to a dashboard.
-5. State exactly which value is required to complete the deployment, such as an existing dashboard group ID or an approved new group name.
+5. State exactly which value is required to complete the deployment, such as an existing dashboard group ID or an approved new group name. State it in the response only: do not introduce a Terraform input variable such as `dashboard_group_id` to carry it unless the Dashboard-container prerequisite gate permits one.
 
 When the user supplies a group name for a new group, use exactly that name. When the user supplies an existing group, reference it and do not create a duplicate.
 
@@ -441,6 +471,46 @@ For dashboards intended to be strictly managed as code and reviewed through Terr
 
 Use dashboard-level filters and variables when the same dimension or property should apply consistently across multiple charts.
 
+Every dashboard `filter` and `variable` block is subject to the Dashboard filter/variable application gate below. The guidance in this section applies only after that gate is satisfied.
+
+### Dashboard filter/variable application gate
+
+This gate is a generation constraint, not a recommendation. It applies before any dashboard `filter` or `variable` block is written and overrides every permissive statement about filters and variables in this file.
+
+1. Property-name evidence is necessary but not sufficient for a deployable dashboard filter or variable.
+2. Provider schema evidence proving that a `filter` or `variable` block exists is also not sufficient by itself.
+3. Before generating a dashboard filter or variable, verify that the mechanism actually constrains the intended generated chart and the selected SignalFlow/telemetry source in the required manner.
+4. This applies particularly to:
+   - `histogram()`
+   - APM Monitoring MetricSets
+   - custom SignalFlow
+   - charts whose SignalFlow does not itself contain the requested scope
+5. If filter/variable reach remains unresolved:
+   - classify the requested filter/variable `UNVERIFIED`
+   - omit its Terraform block
+   - do not generate unscoped SignalFlow while assuming the dashboard will constrain it later
+   - do not say "confirm in preview" as a substitute for pre-generation verification
+   - do not make deployability depend on post-generation visual inspection
+6. A known metric property such as `sf_service` or `sf_environment` must not be treated as proof that a dashboard-level filter or variable applies correctly.
+7. Span or resource-property evidence must not be treated as proof of metric-filter reach.
+8. If the user supplied a fixed scope value such as service `payments`, and the exact metric property plus fixed SignalFlow filtering semantics are sufficiently grounded, a fixed SignalFlow constraint may be used when appropriate.
+   - Keep it consistent with [Variable-to-chart consistency](#variable-to-chart-consistency): do not pair it with a service-switching variable on the same property.
+9. That fixed constraint does not prove that an interactive dashboard filter is supported.
+10. If environment filtering cannot be grounded, keep the environment filter request in the design as `UNVERIFIED` and omit deployable configuration.
+11. Never compensate for an unresolved dashboard filter by introducing grouping. See [Filters versus variables](#filters-versus-variables).
+
+Reach evidence is limited to:
+
+- authoritative Splunk or provider documentation that explicitly addresses the generated chart type and SignalFlow construct
+- supplied repository evidence showing the same mechanism constraining the same chart type and SignalFlow construct
+- a safe read-only inspection, performed before generation, of an existing working dashboard that shows the same
+
+Generic wording such as "applies to all charts" does not by itself establish reach for `histogram()`, APM Monitoring MetricSets, or custom SignalFlow. Previewing or visually inspecting the generated dashboard is not verification.
+
+Dashboard `filter` and `variable` blocks are nested inside `signalfx_dashboard`. When the [Dashboard-container prerequisite gate](#dashboard-container-prerequisite-gate) withholds the container, these blocks are withheld with it. A requested filter that a grounded fixed SignalFlow constraint does not satisfy stays `UNVERIFIED`.
+
+Report each unresolved filter or variable as `UNVERIFIED` and state the missing reach evidence.
+
 ### Fixed dashboard filters
 
 Use a `filter` block when the dashboard should always apply a specific filter.
@@ -460,6 +530,7 @@ Before generating a dashboard filter:
 2. Verify the filter value when possible.
 3. Confirm that the property is relevant to the charts that should be affected.
 4. Do not invent common dimensions merely because they are frequently used.
+5. Confirm the Dashboard filter/variable application gate is satisfied; otherwise omit the block and classify the filter `UNVERIFIED`.
 
 Supported filter behavior includes:
 
@@ -490,6 +561,7 @@ Before generating a dashboard variable:
 3. Do not hard-code values unless fixed defaults or restrictions are required.
 4. Prefer variables for dimensions such as environment, service, namespace, region, cluster, or host only after those dimensions are verified.
 5. Avoid creating variables that do not materially help dashboard navigation.
+6. Confirm the Dashboard filter/variable application gate is satisfied; otherwise omit the block and classify the variable `UNVERIFIED`.
 
 Optional variable behavior can include:
 
@@ -512,8 +584,8 @@ Use a `variable` when the user should be able to change the filter interactively
 
 For example:
 
-- A dashboard dedicated permanently to the `payments` service can use a fixed service filter.
-- A reusable service dashboard intended to switch between services should normally use a service variable.
+- A dashboard dedicated permanently to the `payments` service can use a fixed service filter, applied as a fixed SignalFlow constraint or, once the Dashboard filter/variable application gate is satisfied, as a dashboard `filter`.
+- A reusable service dashboard intended to switch between services should normally use a service variable once the Dashboard filter/variable application gate is satisfied.
 
 Do not generate both a fixed filter and a variable for the same property unless there is a deliberate reason.
 

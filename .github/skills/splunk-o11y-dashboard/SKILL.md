@@ -57,6 +57,8 @@ Follow this workflow in order.
 
 Treat the following rules as non-negotiable before generating Terraform, REST payloads, or SignalFlow.
 
+When completeness conflicts with a grounding, prerequisite, provider-schema, filter-reach, safety, or publication gate, the gate wins. Prefer partial output or zero deployable resources over knowingly non-compliant output.
+
 1. Read the relevant reference instructions before generating code.
    - Do not rely only on an initial preview of a reference file.
    - Read the sections required to verify:
@@ -94,7 +96,7 @@ Treat the following rules as non-negotiable before generating Terraform, REST pa
 
 4. Never invent dimension values.
    - A documented dimension name does not prove values such as `prod`, `staging`, or `dev` exist.
-   - If values are unknown, leave the dashboard variable unrestricted or mark its values unresolved.
+   - If values are unknown, leave the dashboard variable unrestricted (only when the Dashboard filter/variable application gate is satisfied) or mark its values unresolved.
    - Never fabricate service names, environments, regions, endpoints, namespaces, hosts, or other dimension values.
 
 5. Preserve telemetry units.
@@ -129,6 +131,46 @@ Treat the following rules as non-negotiable before generating Terraform, REST pa
    - Mark the implementation `UNVERIFIED`.
    - State exactly what telemetry, dimension, SLO, threshold, unit, API capability, or provider-schema evidence is missing.
    - Do not silently substitute another metric, dimension, aggregation, formula, or visualization.
+
+### Dashboard-container prerequisite gate
+
+This is a generation constraint, not a recommendation.
+
+- A requested dashboard does not by itself authorize inventing or parameterizing a missing container prerequisite.
+- Before generating `signalfx_dashboard`, the dashboard-group association must be sufficiently grounded from the user's input and compatible provider semantics.
+- If the user supplies neither an existing dashboard-group identifier/reference nor an explicit request to create a new group with sufficient grounded inputs:
+  - the dashboard container status remains `UNVERIFIED`
+  - do not generate `signalfx_dashboard`
+  - do not generate `signalfx_dashboard_group`
+  - do not invent a group name, group ID, or Terraform resource address
+  - do not introduce a new required Terraform variable such as `dashboard_group_id` merely to work around the missing prerequisite
+  - verified charts may be emitted as standalone resources when otherwise safe
+  - withhold the container and explain the unresolved prerequisite in the response
+- A required input variable for a missing prerequisite is allowed only when the user explicitly requested that parameterization or supplied authoritative structured input requiring it.
+- The desire to produce a complete dashboard never overrides this gate.
+- Never knowingly generate an artifact that violates a skill rule and then describe it as a "deviation from the skill".
+
+Detailed mechanics: `references/terraform.md`, "Dashboard-container prerequisite gate".
+
+### Dashboard filter/variable application gate
+
+This is a generation constraint, not a recommendation.
+
+- Property-name evidence is necessary but not sufficient for a deployable dashboard filter or variable.
+- Provider-schema evidence that a `filter` or `variable` block exists is also not sufficient by itself.
+- Before generating a dashboard `filter` or `variable`, verify that the mechanism actually constrains the intended generated chart and the selected SignalFlow/telemetry source in the required manner. This applies particularly to `histogram()`, APM Monitoring MetricSets, custom SignalFlow, and charts whose SignalFlow does not itself contain the requested scope.
+- A known metric property such as `sf_service` or `sf_environment` is not proof that a dashboard-level filter or variable applies correctly.
+- Span or resource-property evidence is not proof of metric-filter reach.
+- If filter/variable reach remains unresolved:
+  - classify the requested filter/variable `UNVERIFIED` and keep it in the design
+  - omit its Terraform block
+  - do not generate unscoped SignalFlow while assuming the dashboard will constrain it later
+  - do not say "confirm in preview" as a substitute for pre-generation verification
+  - do not make deployability depend on post-generation visual inspection
+  - never compensate by introducing grouping
+- A user-supplied fixed scope such as service `payments` may be applied as a fixed SignalFlow constraint when the exact metric property and fixed SignalFlow filtering semantics are sufficiently grounded. A fixed constraint does not prove that an interactive dashboard filter is supported.
+
+Detailed mechanics: `references/terraform.md`, "Dashboard filter/variable application gate".
 
 ## Explicit forbidden generation patterns
 
@@ -205,6 +247,8 @@ default = "us0"
 when the target realm is unknown.
 
 Keep the realm required, derive it from verified configuration, or mark it unresolved.
+
+This applies to the realm only. It does not authorize a required Terraform variable for a missing dashboard group or any other missing structural prerequisite (see the Dashboard-container prerequisite gate).
 
 Do not generate a dashboard URL from an assumed realm or legacy hostname.
 
@@ -365,10 +409,10 @@ For service and environment dashboard variables:
 - verify the property name
 - do not invent values
 - do not invent defaults
-- use unrestricted variables when supported and appropriate
-- use fixed filters only when the requested scope is explicitly fixed
+- use unrestricted variables when supported, appropriate, and the Dashboard filter/variable application gate is satisfied
+- use fixed filters only when the requested scope is explicitly fixed; a dashboard-level `filter` block additionally requires that gate
 
-For a dashboard specifically requested for service `payments`, it is acceptable to use a verified `service.name` property with the supplied value `payments`.
+For a dashboard specifically requested for service `payments`, it is acceptable to use a verified `service.name` property with the supplied value `payments`, either as a fixed SignalFlow constraint when the exact metric property and filtering semantics are grounded, or as a dashboard-level `filter` only when the Dashboard filter/variable application gate is satisfied.
 
 Do not infer the environment value.
 
@@ -398,7 +442,7 @@ Do not construct a dashboard URL using an unrelated resource, guessed hostname, 
 
 5. Design the dashboard before generating code.
    - Select charts based on the operational question being answered, not merely on visualization availability.
-   - Define shared dashboard variables and filters before chart-level filters where appropriate.
+   - Define shared dashboard variables and filters before chart-level filters where appropriate and only when the Dashboard filter/variable application gate is satisfied; otherwise keep them `UNVERIFIED`.
    - Group related panels logically.
    - Avoid duplicate charts that answer the same operational question.
    - Prefer useful operational signals over decorative visualizations.
@@ -431,6 +475,7 @@ Apply these rules before writing code:
 - Do not generate both a fixed dashboard filter and an interactive variable for the same property unless their combined behavior is explicitly required and non-conflicting.
 - A fixed `service.name = payments` filter prevents a service variable from switching the dashboard to another service.
 - Verify every dashboard-level Terraform attribute against the provider schema; omit attributes that cannot be verified.
+- Before generating `signalfx_dashboard`, confirm the Dashboard-container prerequisite gate is satisfied. Before generating any dashboard `filter` or `variable`, confirm the Dashboard filter/variable application gate is satisfied. A failed gate removes the blocked container, filter, or variable from deployable output; it never licenses unscoped SignalFlow that relies on a dashboard-level constraint applied later.
 - Before finalizing layout, calculate each chart's occupied rows and columns and ensure no chart regions overlap.
 - Do not describe the Terraform as production-ready or ready to apply while any generated resource depends on unresolved semantics.
 
