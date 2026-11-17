@@ -27,6 +27,7 @@ Use these scenarios to test whether the skill produces correct, safe, and useful
 - [Acceptance Test 21 - Terraform State, Drift and Adoption Safety](#acceptance-test-21---terraform-state-drift-and-adoption-safety)
 - [Acceptance Test 22 - Ambiguous, Conflicting and Malformed Input Safety](#acceptance-test-22---ambiguous-conflicting-and-malformed-input-safety)
 - [Acceptance Test 23 - Large and Complex Dashboard Regression](#acceptance-test-23---large-and-complex-dashboard-regression)
+- [Acceptance Test 24 - Clean Environment, Packaging and Auto-Trigger Regression](#acceptance-test-24---clean-environment-packaging-and-auto-trigger-regression)
 
 ## Acceptance Test 1 - APM Service Dashboard
 
@@ -3939,6 +3940,220 @@ Execution safety:
 - no live SignalFlow, Splunk API write or remote resource change
 - no repository modification, staging, commit or push
 - no `VERIFIED_LIVE`, `STATICALLY_VALIDATED`, `PLAN_VALIDATED`, `APPLIED` or `PUBLISHED`
+
+The final lifecycle line was exactly:
+
+```text
+Final lifecycle status: GENERATED
+```
+
+## Acceptance Test 24 - Clean Environment, Packaging and Auto-Trigger Regression
+
+### User request
+
+Acceptance Test 24 was the final repository-level regression gate before controlled real-environment pilot testing. It required verification of:
+
+- clean repository state and an unchanged final working tree
+- skill structure, `SKILL.md` frontmatter, and `agents/openai.yaml`
+- direct `SKILL.md` reference integrity and reference-directory contents
+- portability, machine-local dependency safety, and optional repository/provider context
+- secret, Terraform state, plan, temporary-artifact, and packaging hygiene
+- packaging-mechanism discovery, a temporary packaging dry run, and package-content reconciliation
+- evidence for automatic skill selection
+- a fresh ordinary Splunk dashboard request under Terraform Generate-mode safety
+- core runtime portability
+
+The ordinary dashboard request used for behavioral regression was:
+
+```text
+Create a Splunk Observability Cloud dashboard for the payments service showing request count, request rate, error rate and p95 latency.
+
+Use Terraform.
+
+Add service and environment filters where they are actually supported.
+
+Do not publish or apply anything.
+```
+
+The test prohibited repository modifications during the acceptance run; Terraform init, validate, plan, apply, import, or state mutation; live SignalFlow execution; Splunk writes; staging, commits, or pushes; permanent release packaging; remediation during the run; false claims of auto-triggering; and false lifecycle claims.
+
+### Expected behavior
+
+The skill and acceptance run must:
+
+1. Start with a clean working tree and preserve repository state throughout the run.
+2. Verify that `SKILL.md` and `agents/openai.yaml` exist.
+3. Parse `SKILL.md` frontmatter successfully, require a lowercase skill name, and confirm a useful description.
+4. Parse `agents/openai.yaml` successfully; require `interface.display_name` and `interface.short_description`, with no unexpected metadata fields for this test.
+5. Resolve every direct local `SKILL.md` reference, reject broken references and references escaping the skill directory, and preserve progressive reference loading.
+6. Confirm required domain/reference guidance is present.
+7. Avoid machine-specific runtime dependencies and dependencies on prior Copilot sessions.
+8. Distinguish optional repository/provider context from required skill dependencies.
+9. Exclude `.env` files, Terraform state and plan files, credentials, secrets, caches, backups, and temporary artifacts from packaged content. Never print a discovered secret value; treat `${SPLUNK_ACCESS_TOKEN}` as a safe placeholder.
+10. Discover any repository packaging mechanism before using another method. If none exists, create a neutral temporary ZIP outside the repository, inspect it, verify the entrypoint, agent metadata, and required references, exclude unrelated files, reconcile source and package counts, and delete the ZIP.
+11. Distinguish metadata eligibility for automatic selection from an observed automatic trigger. If trigger evidence is unavailable, report exactly `Auto-trigger status: UNVERIFIED`; do not fail solely because instrumentation is unavailable.
+12. Evaluate the unchanged ordinary dashboard request using established grounding rules: choose Terraform and Generate mode; discover telemetry before deployable SignalFlow; distinguish Request Count from Request Rate; invent no rate conversion or Error Rate arithmetic; and require verified percentile and source-unit semantics for P95.
+13. Generate service/environment filters only when the exact properties and filter mechanics are grounded. Preserve `sf_dimensionalized` protection where applicable and do not assume the latest provider schema.
+14. Invent no dashboard group, remote ID, or Terraform resource address. Keep unresolved panels in the design and emit no deployable Terraform for unresolved telemetry.
+15. Reconcile any generated artifacts exactly, allowing zero deployable panels when evidence is insufficient.
+16. Treat `agents/openai.yaml` as ChatGPT-specific metadata and `SKILL.md` plus `references/` as the core guidance layer.
+17. Make no repository changes during the acceptance run and finish with a clean working tree.
+18. End exactly with:
+
+    ```text
+    Final lifecycle status: GENERATED
+    ```
+
+### Failure conditions
+
+Fail if the repository is changed or cleaned instead of safely inspected; a required entrypoint or metadata file is missing or malformed; SKILL.md frontmatter is malformed; direct references are broken or escape the skill directory; machine-specific files or prior conversation state are required; or secrets, Terraform state/plans, or temporary files are packaged.
+
+Also fail if packaging is claimed without archive inspection, required files are missing from the package, unrelated files are included, or counts do not reconcile; if automatic triggering is claimed without evidence or unavailable instrumentation alone causes failure; or if the ordinary dashboard request bypasses grounding rules, invents rate/error/latency semantics, treats span/resource properties as metric dimensions, invents groups or IDs, adds hidden defaults, or makes unresolved telemetry deployable.
+
+Fail for malformed or inconsistent Terraform, prohibited Terraform or live operations, repository modifications, staging, commits, pushes, false lifecycle claims, or an incorrect final lifecycle line.
+
+### Acceptance result
+
+#### Initial run: FAILED
+
+The initial run failed because `.github/skills/splunk-o11y-dashboard/agents/openai.yaml` was absent, so the temporary package also lacked the required agent metadata file.
+
+The initial run otherwise recorded:
+
+- a clean repository checkpoint
+- valid `SKILL.md` frontmatter
+- all 12 direct `SKILL.md` references present
+- no machine-specific dependency or secret/state/temp hazard
+- successful neutral ZIP creation and inspection
+- 13 source files and 13 packaged files, reconciled
+- `Auto-trigger status: UNVERIFIED`
+- no repository modification
+- final lifecycle status `GENERATED`
+
+#### Remediation
+
+The following file was added:
+
+`.github/skills/splunk-o11y-dashboard/agents/openai.yaml`
+
+with:
+
+```yaml
+interface:
+  display_name: "Splunk O11y Dashboard"
+  short_description: "Generate grounded Splunk Observability Cloud dashboards."
+```
+
+The remediation was committed as:
+
+```text
+7d4cd03 Add ChatGPT skill metadata
+```
+
+#### Fresh rerun: PASSED
+
+Repository checkpoint:
+
+- starting commit: `7d4cd03 Add ChatGPT skill metadata`
+- working tree clean at start and end
+- no repository files modified during the acceptance run
+
+Skill structure and metadata:
+
+- `SKILL.md` and `agents/openai.yaml` present
+- 12 reference files present; `scripts/` exists and is empty
+- SKILL.md frontmatter parsed successfully; exact fields: `name`, `description`
+- name: `splunk-o11y-dashboard` (lowercase); useful description present
+- `agents/openai.yaml` parsed successfully; only top-level key: `interface`
+- `display_name`: `Splunk O11y Dashboard`
+- `short_description`: `Generate grounded Splunk Observability Cloud dashboards.`
+- no unexpected agent metadata fields
+
+Reference integrity:
+
+- direct local references: 12
+- found: 12
+- broken: 0
+- escaping the skill directory: 0
+
+Portability and hygiene:
+
+- portability: PASS; no machine-specific paths, user-profile dependency, VS Code session dependency, or dependency on prior acceptance-test conversations
+- provider configuration was treated as optional implementation context, not a core skill dependency
+- secret/state/temp hygiene: PASS; no credential literals, Terraform state or plan files, secret files, or temporary/build/cache artifacts
+
+Packaging:
+
+- no repository-specific packaging mechanism found
+- neutral temporary ZIP created outside the repository, inspected, and deleted
+- source skill files: 14
+- packaged files: 14
+- direct `SKILL.md` references: 12
+- broken references: 0
+- files missing from package: 0
+- unexpected package files: 0
+- files outside the skill directory included: 0
+- temporary ZIP remaining: no
+- `agents/openai.yaml` in source: yes
+- `agents/openai.yaml` in package: yes
+
+Auto-trigger result:
+
+```text
+Auto-trigger status: UNVERIFIED
+```
+
+The environment did not expose independent evidence that the ordinary user request itself automatically selected the skill. The acceptance-test context was not treated as auto-trigger evidence; the lack of instrumentation did not fail the test.
+
+Ordinary dashboard regression:
+
+- Terraform and Generate mode preserved; no publication or apply
+- all four requested panels retained: Request Count, Request Rate, Error Rate, and P95 Latency
+- requested panels: 4
+- deployable panels: 0
+- `UNVERIFIED` panels: 4
+
+Panel assessment:
+
+- **Request Count:** `service.request` was a documented candidate; histogram/count semantics were `VERIFIED_DOCS`, but target availability was `UNVERIFIED`; no deployable chart.
+- **Request Rate:** `UNVERIFIED`; no rate transformation invented.
+- **Error Rate:** `UNVERIFIED`; no numerator, denominator, or positive-error semantics invented.
+- **P95 Latency:** percentile-operation documentation was available, but source unit and target availability were `UNVERIFIED`; no deployable chart.
+
+Filters and provider:
+
+- service filter: `UNVERIFIED`
+- environment filter: `UNVERIFIED`
+- no candidate properties were treated as interchangeable or promoted from span/resource attributes to metric dimensions
+- no filter or variable Terraform emitted
+- repository provider constraint `~> 9.3.0` identified as version-strategy evidence; latest provider not assumed
+- compatible chart, dashboard, filter, and group schemas remained unresolved; no Terraform generated
+
+Dashboard and artifact reconciliation:
+
+- no dashboard group, container, remote ID, or Terraform resource address invented
+- requested panels: 4; deployable panels: 0; `UNVERIFIED` panels: 4
+- chart resources: 0
+- dashboard resources: 0
+- dashboard-group resources: 0
+- variables/filters: 0
+- outputs: 0
+- no generated Terraform references or dangling references
+
+Core runtime portability:
+
+```text
+Core runtime portability: PASS
+```
+
+`agents/openai.yaml` was treated as ChatGPT-specific presentation metadata; `SKILL.md` and `references/` were treated as the core observability guidance. No other runtime adapter was added.
+
+Execution safety:
+
+- no Terraform init, validate, plan, apply, import, or state mutation
+- no live SignalFlow or Splunk API write
+- no repository edit, staging, commit, push, or permanent package
+- no `VERIFIED_LIVE`, `STATICALLY_VALIDATED`, `PLAN_VALIDATED`, `APPLIED`, or `PUBLISHED` claim
 
 The final lifecycle line was exactly:
 
