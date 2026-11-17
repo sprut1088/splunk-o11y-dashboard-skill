@@ -1,0 +1,3 @@
+interface:
+  display_name: "Splunk O11y Dashboard"
+  short_description: "Generate grounded Splunk Observability Cloud dashboards."
