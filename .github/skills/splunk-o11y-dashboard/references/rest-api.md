@@ -18,6 +18,7 @@
 - [Update semantics verification gate](#update-semantics-verification-gate)
 - [Delete behavior](#delete-behavior)
 - [Failure and orphan handling](#failure-and-orphan-handling)
+- [Destructive operation, dependency and cleanup gate](#destructive-operation-dependency-and-cleanup-gate)
 - [REST validation and publish safety](#rest-validation-and-publish-safety)
 - [Uncertain write outcome gate](#uncertain-write-outcome-gate)
 - [Concurrency and lost-update evidence gate](#concurrency-and-lost-update-evidence-gate)
@@ -416,7 +417,7 @@ Treat delete operations as destructive.
 Before deleting a chart, dashboard, or dashboard group:
 
 1. Confirm the exact resource ID.
-2. Determine whether other resources depend on it when possible.
+2. Establish relevant dependency state under the [Destructive operation, dependency and cleanup gate](#destructive-operation-dependency-and-cleanup-gate); block deletion if it cannot be sufficiently established.
 3. Show the intended deletion.
 4. Require explicit user confirmation.
 
@@ -435,6 +436,148 @@ If charts are created successfully but dashboard creation fails:
 Prefer recoverable and idempotent behavior over blindly recreating resources.
 
 When any create, update, or delete outcome is uncertain, apply the [Uncertain write outcome gate](#uncertain-write-outcome-gate).
+
+## Destructive operation, dependency and cleanup gate
+
+Apply this gate before proposing or executing destructive cleanup of a chart, dashboard, dashboard group, or other resource. Removing a reference and deleting a resource are distinct operations.
+
+### Destructive evidence classification
+
+Treat user statements such as "unused", "old", "orphan", "safe to delete", "nobody uses it", and "group is empty" as user-supplied facts or beliefs, not evidence that establishes current dependency state.
+
+Do not classify a resource as unused, orphaned, globally unreferenced, disposable, or safe to delete unless sufficient current evidence establishes that conclusion. Absence from the requested future dashboard design does not establish that a resource is unused elsewhere.
+
+### Membership changes and resource deletion
+
+Distinguish these operations:
+
+1. Removing a chart reference from a dashboard is an update to that dashboard.
+2. Deleting the chart is a separate destructive operation on the chart resource.
+3. Deleting a dashboard is a separate destructive operation on the dashboard resource.
+4. Deleting a dashboard group is a separate destructive operation on the group resource.
+
+Removing a chart from one dashboard is neither authorization nor evidence to delete the chart. Each destructive resource operation requires its own exact identity, dependency analysis, endpoint verification, semantic verification, impact assessment, and explicit destructive approval.
+
+### Dependency-state hard gate
+
+Before proposing any DELETE, establish the exact resource identity and determine relevant current dependency state using only independently `VERIFIED_DOCS` read, search, or list operations. Verify the exact method, path, and query behavior under the [Endpoint verification gate](#endpoint-verification-gate).
+
+Never invent references, usage, used-by, children, dependency, reverse-lookup, or other endpoints. Never infer global non-use from one dashboard read, exclusive ownership, or group emptiness from a user assertion. Never infer absence from failed reads or incomplete searches.
+
+If dependency state cannot be sufficiently established, report:
+
+```text
+Dependency state: UNVERIFIED
+Dependency state remains UNVERIFIED; deletion is blocked until relevant dependency and impact evidence is sufficient.
+```
+
+Keep deletion `BLOCKED`; do not call the resource orphaned or unused, generate a ready-to-execute DELETE, or present DELETE as ready for approval.
+
+### Negative dependency evidence
+
+A zero-result lookup is not automatically proof of non-use, absence of dependencies, or group emptiness. Before relying on it, verify where applicable:
+
+- the correct resource population and scope
+- complete pagination
+- sufficient visibility and permissions
+- query and search completeness
+- relevant consistency semantics
+- reliable resource identity
+
+If any applicable requirement remains unresolved, dependency state, non-use, or emptiness remains `UNVERIFIED`. Apply the negative lookup evidence rules in the [Uncertain write outcome gate](#uncertain-write-outcome-gate) as well.
+
+### DELETE endpoint and semantics verification
+
+Verify DELETE support independently for each exact resource. Do not infer it from GET, POST, PUT, or support for another resource.
+
+Before presenting a DELETE as actionable, independently verify against authoritative Splunk documentation:
+
+- the exact HTTP method and path
+- the required resource identifier
+- relevant request requirements
+- documented response behavior
+- documented preconditions
+
+Separately verify any relevant hard delete, soft delete, detach, cascade, non-cascade, recoverability, restore or undelete, transactionality, and rollback semantics. Do not infer these from generic REST conventions. Mark each relevant semantic `UNVERIFIED` when it is not authoritatively established, and block deletion when dependency or impact evidence is insufficient.
+
+### Conflicting authoritative evidence
+
+If authoritative or vendor-maintained sources materially conflict about destructive behavior, do not choose whichever is more convenient or silently reconcile them. Record the conflict, mark the disputed semantic `UNVERIFIED`, surface the more severe plausible impact as a risk, and keep the destructive operation blocked until the applicable behavior is sufficiently resolved.
+
+For example, if one source says deleting a group may delete dashboards and another says dashboards are detached, do not claim either behavior is established. Mark group-deletion impact semantics `UNVERIFIED` and keep group deletion blocked.
+
+### Separate destructive approval
+
+Publish mode is not destructive authorization. Approval to create, update, or change dashboard membership does not authorize DELETE.
+
+For each DELETE, show all of the following before obtaining separate explicit destructive approval:
+
+- exact resource identity
+- current dependency state
+- exact independently verified DELETE method and path
+- verified and unresolved delete semantics
+- affected resources and likely impact
+- unresolved risks
+
+Separate resources require separate destructive decisions. Dashboard-group deletion always requires its own explicit destructive approval. Approval does not resolve missing evidence or override a block.
+
+### Dashboard-group deletion gate
+
+Before proposing dashboard-group deletion:
+
+1. Fresh-read and verify the exact group identity using a `VERIFIED_DOCS` operation.
+2. Establish current membership using `VERIFIED_DOCS` operations, accounting for pagination, visibility, and permissions where applicable.
+3. Distinguish zero visible dashboards from proven empty membership; do not rely on a user assertion.
+4. Independently verify the group DELETE endpoint and relevant cascade, detach, and deletion impact semantics.
+5. Surface any documentation conflicts and obtain separate explicit destructive approval only after the evidence and impact are shown.
+
+If current group emptiness or destructive impact cannot be sufficiently established, report:
+
+```text
+Dashboard-group deletion: BLOCKED
+```
+
+### Delete-and-recreate prohibition
+
+Never delete and recreate a chart, dashboard, group, or other resource as a workaround for unresolved update semantics, a failed update, unknown dependencies, stale reads, concurrency conflicts, duplicate detection, an uncertain write outcome, or missing API knowledge. Never recommend deleting resources merely to obtain a "clean slate".
+
+### Uncertain DELETE outcome
+
+Apply the [Uncertain write outcome gate](#uncertain-write-outcome-gate) to DELETE. If a DELETE was sent but its server-side outcome is uncertain:
+
+- keep the result `UNVERIFIED`; assume neither success nor failure
+- preserve the known resource ID
+- do not recreate or issue another DELETE blindly
+- verify current state using safe, independently `VERIFIED_DOCS` reads
+- keep dependent cleanup blocked until state is sufficiently established
+- require separate approval for any follow-up destructive or create operation
+
+Distinguish a DELETE request sent, a response observed, successful deletion established, and resource absence established. These states are not equivalent.
+
+### Ordering destructive cleanup
+
+For future cleanup workflows, preserve this order:
+
+1. Fresh-read the exact resources.
+2. Verify current identities.
+3. Verify current membership and configuration.
+4. Detect concurrent changes.
+5. Establish dependencies.
+6. Verify update and DELETE endpoints and semantics.
+7. Prepare non-destructive membership or update changes separately.
+8. Show the exact effects.
+9. Obtain approval for update operations.
+10. Obtain separate destructive approval for each DELETE.
+11. Verify post-operation state.
+12. Only then consider dependent cleanup.
+
+Never reverse this order for convenience. Repeat the relevant evidence and approval gates for subsequent cleanup; an earlier approval does not authorize a later operation.
+
+### Concurrency and existing safeguards
+
+A dashboard membership removal must satisfy the [Concurrency and lost-update evidence gate](#concurrency-and-lost-update-evidence-gate). Do not generate a ready-to-execute dashboard update from stale state. If replacement or merge semantics remain `UNVERIFIED`, do not generate an executable update payload or use delete-and-recreate as a workaround.
+
+This gate does not relax endpoint verification, update-semantics verification, uncertain-write outcome handling, read-failure or negative-evidence handling, credential safety, concurrency and lost-update safety, or separate Publish approval.
 
 ## REST validation and publish safety
 
