@@ -7,11 +7,13 @@ description: Create, validate, and optionally publish Splunk Observability Cloud
 
 Follow this workflow in order.
 
+The mandatory generation gates govern every artifact write from the beginning of the task. Reading a reference file or beginning exploratory research does not authorize writing Terraform before the applicable gates have been evaluated. See "Pre-artifact-write gate" under Mandatory generation gates.
+
 1. Understand the dashboard request.
    - Accept either natural-language requirements or structured YAML/JSON.
    - Treat structured input as authoritative: never add unrequested windows, intervals, groupings, filters, variables, or dashboard groups (see `references/input-spec.md`).
    - Identify the dashboard purpose, intended audience, telemetry domain, desired output format, target Splunk realm if relevant, requested filters, and required services or resources.
-   - Ask only for information that is genuinely required to produce a correct dashboard.
+   - Ask only for information that is genuinely required to produce a correct dashboard, and ask it before writing any artifact that depends on the answer.
    - Preserve requested panels even when their implementation cannot yet be verified.
 
 2. Determine the generation mode.
@@ -131,6 +133,39 @@ When completeness conflicts with a grounding, prerequisite, provider-schema, fil
    - Mark the implementation `UNVERIFIED`.
    - State exactly what telemetry, dimension, SLO, threshold, unit, API capability, or provider-schema evidence is missing.
    - Do not silently substitute another metric, dimension, aggregation, formula, or visualization.
+
+### Pre-artifact-write gate
+
+This is a generation constraint, not a recommendation. Every gate in this section applies at the moment a dashboard artifact (Terraform, REST payload, or SignalFlow) is first written and at every later write, not merely to the final reconciled artifact.
+
+Before creating or modifying any dashboard artifact:
+
+1. Normalize the request and classify every requested panel, filter, variable, dashboard-group/container requirement, and semantic choice as sufficiently grounded or `UNVERIFIED`.
+2. Resolve any user decision that is genuinely required before a deployable implementation, such as:
+   - whether "Error Rate" means a percentage, errors per second, or another definition
+   - whether a dashboard group is existing, new, or intentionally absent
+   - a required scope value whose meaning cannot be inferred
+   - mutually exclusive interpretations that produce materially different Terraform or SignalFlow
+3. If clarification is necessary:
+   - ask before writing the affected deployable resource
+   - do not generate a speculative implementation as a temporary draft
+   - do not create it with a guessed interpretation and remove or repair it later
+4. If clarification is unavailable or intentionally skipped:
+   - preserve the requested item in the design
+   - classify it `UNVERIFIED`
+   - omit its deployable Terraform and SignalFlow
+
+Additional rules:
+
+- A temporary, intermediate, hidden, or later-deleted resource is still generation. The gates apply to initial file creation, intermediate edits, temporary drafts, tool-generated artifacts, and the final output.
+- Final reconciliation is not a substitute for safe generation. A speculative resource that is later removed is still a gate violation.
+- A clarification question asked after the affected resource was written does not satisfy a pre-generation clarification requirement.
+- Safe standalone resources may still be generated while unrelated requested items remain `UNVERIFIED`, but only after those unresolved items have already been classified and excluded from the artifact.
+- When a later answer grounds an excluded item, such as an explicit request for a new dashboard group with its exact name, add that item in a later write that passes this gate.
+
+Example: if the request says only "error rate" and both failed requests / total requests × 100 and errors per second remain valid meanings, do not write either implementation until the user selects one or authoritative input defines the intended semantic. If the user declines to choose, retain Error Rate as `UNVERIFIED` and omit its resource.
+
+Detailed mechanics: `references/terraform.md`, "Pre-artifact-write gate".
 
 ### Dashboard-container prerequisite gate
 
@@ -451,7 +486,7 @@ Do not construct a dashboard URL using an unrelated resource, guessed hostname, 
 
 ### Final pre-generation consistency gate
 
-Immediately before creating Terraform, REST payloads, or SignalFlow, perform this check for every requested panel.
+Immediately before creating or modifying Terraform, REST payloads, or SignalFlow, perform this check for every requested panel.
 
 For each panel determine:
 
@@ -475,7 +510,7 @@ Apply these rules before writing code:
 - Do not generate both a fixed dashboard filter and an interactive variable for the same property unless their combined behavior is explicitly required and non-conflicting.
 - A fixed `service.name = payments` filter prevents a service variable from switching the dashboard to another service.
 - Verify every dashboard-level Terraform attribute against the provider schema; omit attributes that cannot be verified.
-- Before generating `signalfx_dashboard`, confirm the Dashboard-container prerequisite gate is satisfied. Before generating any dashboard `filter` or `variable`, confirm the Dashboard filter/variable application gate is satisfied. A failed gate removes the blocked container, filter, or variable from deployable output; it never licenses unscoped SignalFlow that relies on a dashboard-level constraint applied later.
+- Before generating `signalfx_dashboard`, confirm the Dashboard-container prerequisite gate is satisfied. Before generating any dashboard `filter` or `variable`, confirm the Dashboard filter/variable application gate is satisfied. A failed gate excludes the blocked container, filter, or variable from deployable output before any artifact is written; it never licenses unscoped SignalFlow that relies on a dashboard-level constraint applied later.
 - Before finalizing layout, calculate each chart's occupied rows and columns and ensure no chart regions overlap.
 - Do not describe the Terraform as production-ready or ready to apply while any generated resource depends on unresolved semantics.
 
@@ -518,7 +553,7 @@ Correct partial Terraform is preferable to complete but speculative Terraform.
    - Check every Terraform resource attribute against the selected provider schema.
    - Report assumptions and unresolved gaps.
    - Assign only the validation status actually achieved.
-   - Reconcile the final artifact with the report, then end with `Final lifecycle status: <STATUS>` (see `references/output-contract.md`).
+   - Reconcile the final artifact with the report, then end with `Final lifecycle status: <STATUS>` (see `references/output-contract.md`). Reconciliation is a final consistency check; it does not cure a gate violation in an earlier write (see "Pre-artifact-write gate").
 
 8. Publish only when explicitly requested.
    - Never publish or apply merely because credentials or connectivity are available.

@@ -2,6 +2,7 @@
 
 ## Contents
 
+- [Pre-artifact-write gate](#pre-artifact-write-gate)
 - [Critical pre-generation gate: Terraform provider schema](#critical-pre-generation-gate-terraform-provider-schema)
 - [Core rule](#core-rule)
 - [Provider and resource hierarchy](#provider-and-resource-hierarchy)
@@ -22,6 +23,66 @@
 
 
 Use this reference whenever generating, reviewing, validating, or troubleshooting Terraform for Splunk Observability Cloud dashboards.
+
+## Pre-artifact-write gate
+
+This gate is a generation constraint, not a recommendation. It sets when every other gate in this file and in `SKILL.md` applies: at the moment a Terraform dashboard artifact is first written and at every later write, not merely to the final reconciled artifact.
+
+The mandatory generation gates govern every artifact write from the beginning of the task. Reading a reference file or beginning exploratory research does not authorize writing Terraform before the applicable gates have been evaluated.
+
+### What counts as a write
+
+A temporary, intermediate, hidden, or later-deleted resource is still generation. This gate applies to:
+
+- initial file creation
+- intermediate edits
+- temporary drafts
+- tool-generated artifacts
+- final output
+
+### Required sequence
+
+Before creating or modifying any Terraform dashboard artifact:
+
+1. Normalize the request and classify every requested panel, filter, variable, dashboard-group/container requirement, and semantic choice as sufficiently grounded or `UNVERIFIED`. Apply the [provider-schema gate](#critical-pre-generation-gate-terraform-provider-schema), the [Dashboard-container prerequisite gate](#dashboard-container-prerequisite-gate), the [Dashboard filter/variable application gate](#dashboard-filtervariable-application-gate), and the telemetry and SignalFlow rules during this classification.
+2. Resolve any user decision that is genuinely required before a deployable implementation. Examples:
+   - whether "Error Rate" means a percentage, errors per second, or another definition
+   - whether a dashboard group is existing, new, or intentionally absent
+   - a required scope value whose meaning cannot be inferred
+   - mutually exclusive interpretations that produce materially different Terraform or SignalFlow
+3. If clarification is necessary:
+   - ask before writing the affected deployable resource
+   - do not generate a speculative implementation as a temporary draft
+   - do not create it with a guessed interpretation and remove or repair it later
+4. If clarification is unavailable or intentionally skipped:
+   - preserve the requested item in the design
+   - classify it `UNVERIFIED`
+   - omit its deployable Terraform and SignalFlow, including its dashboard `chart` block
+5. Write only resources whose classification is complete and grounded.
+
+### Rules
+
+- Final reconciliation is not a substitute for safe generation. A speculative resource that is later removed is still a gate violation. See [Generated resources must match the report](#generated-resources-must-match-the-report).
+- A clarification question asked after the affected resource was written does not satisfy a pre-generation clarification requirement, regardless of how the question is asked.
+- Safe standalone resources may still be generated while unrelated requested items remain `UNVERIFIED`, but only after those unresolved items have already been classified and excluded from the artifact.
+- When a later answer grounds an excluded item, add it in a later write that passes this gate. For example, an explicit request for a new dashboard group with its exact name satisfies the [Dashboard-container prerequisite gate](#dashboard-container-prerequisite-gate), so the group and dashboard may then be written.
+
+### Error Rate example
+
+If the request says only:
+
+```text
+error rate
+```
+
+and multiple materially different meanings remain valid, such as:
+
+- failed requests / total requests × 100
+- errors per second
+
+then do not write either implementation before the user selects one or authoritative input defines the intended semantic. Otherwise grounded panels in the same request, such as request count or p95 latency, may still be written.
+
+If the user declines to choose, retain Error Rate as `UNVERIFIED` and omit its resource.
 
 ## Critical pre-generation gate: Terraform provider schema
 
@@ -410,6 +471,7 @@ The final Terraform is the source of truth for what was generated. Before report
 - A panel, variable, filter, or group reported `UNVERIFIED` or omitted must not have a resource, nested `chart`, `variable`, or `filter` block, or output in the Terraform.
 - A resource present in the Terraform must be reported as generated.
 - Header comments in generated files, such as a "Not implemented" note, must match the final resources.
+- Reconciliation is a final consistency check, not a substitute for the [Pre-artifact-write gate](#pre-artifact-write-gate). Removing a speculative resource during reconciliation does not cure the earlier write. The reconciliation gate's instruction to remove or fix items catches mistakes; it does not license writing first and cleaning up later.
 
 
 ## Dashboard layout rules
@@ -678,7 +740,7 @@ Treat Terraform generation, validation, planning, and application as separate st
 
 In Generate mode:
 
-1. Generate the required Terraform files.
+1. Generate the required Terraform files, writing each resource only after the [Pre-artifact-write gate](#pre-artifact-write-gate) is satisfied for it.
 2. Use verified provider resources and attributes.
 3. Use verified telemetry and SignalFlow.
 4. Do not run or imply `terraform apply`.

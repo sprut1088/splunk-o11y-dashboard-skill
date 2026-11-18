@@ -159,6 +159,8 @@ Then check every requested panel, variable, filter, dashboard group, and other r
 
 If any check fails, fix the artifact or the report before responding.
 
+This gate is a final consistency check, not authorization to generate speculative deployable code. Every generation, prerequisite, and grounding gate applies before the affected artifact or resource is first written (see "Pre-artifact-write gate" in `SKILL.md` and `terraform.md`), so an item already classified `UNVERIFIED` before generation is omitted from deployable output from the beginning. The instructions above to remove an item from deployable output and to fix the artifact or the report are recovery steps for mistakes detected here, not permission to generate first and clean up later. When reconciliation finds an accidental gate violation, the correction is still required for the final artifact, but it does not make the earlier write compliant.
+
 ## Final lifecycle status
 
 End every response that delivers generated dashboard artifacts with exactly one line using the lifecycle vocabulary:
